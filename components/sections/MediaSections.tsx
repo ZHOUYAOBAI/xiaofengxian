@@ -279,24 +279,40 @@ export function MyTheatreSection() {
     <section id="studio" className="section relative z-10" style={{ background: 'var(--paper)', color: 'var(--ink)' }}>
       <div className="shell">
         <div className="sec-head" data-reveal>
-          <span className="t-kicker">MY THEATRE</span>
+          <span className="t-kicker">ACTOR WORKBENCH</span>
           <h2 className="t-title font-cn">
-            我的<span style={{ color: 'var(--vermilion)' }}>剧场</span>
+            演员<span style={{ color: 'var(--vermilion)' }}>工作台</span>
           </h2>
-          <p className="t-lead">剧组成员与导演的工作区：角色台词、我的预约、投递进度。</p>
+          <p className="t-lead">剧组专属板块 · 新演员学角色用。网站其余内容对观众开放，点进工作台才需要演员密码。</p>
         </div>
 
-        <div className="grid md:grid-cols-3 gap-6" data-reveal>
-          <a
-            href="script"
-            className="p-7 rounded-2xl no-underline transition-transform hover:-translate-y-1"
-            style={{ background: 'var(--ink)', color: 'var(--paper)' }}
-          >
-            <div className="text-[11px] tracking-[0.24em] text-gold/80">演员 · 密码进入</div>
-            <h3 className="font-cn text-[20px] mt-3 text-paper">演员工作台</h3>
-            <p className="mt-3 text-[14px] leading-[1.9] text-paper/60">全剧八幕 74 场 26 曲完整在册：点角色名，他的台词全部凸现；背诵模式逐句翻开，进度本机保存。输入演员密码进入。</p>
-            <span className="link-line inline-block mt-5 text-[13px]">进入 →</span>
-          </a>
+        {/* 工作台入口：专门板块横幅 */}
+        <a
+          href="script"
+          data-reveal
+          className="block p-8 md:p-10 rounded-3xl no-underline transition-transform hover:-translate-y-1 relative overflow-hidden"
+          style={{ background: 'linear-gradient(135deg, #0E1A24 0%, #1A2A38 70%)', color: 'var(--paper)', border: '1px solid rgba(201,162,75,0.35)' }}
+        >
+          <div className="absolute -right-8 -top-8 w-44 h-44 rounded-full opacity-20" style={{ background: 'radial-gradient(circle, #C9A24B 0%, transparent 70%)' }} />
+          <div className="relative flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+            <div className="max-w-[520px]">
+              <div className="text-[11px] tracking-[0.3em] text-gold">演员专属 · 需密码 2021888</div>
+              <h3 className="font-cn text-[clamp(22px,3.4vw,30px)] mt-3 text-paper">整部剧本 · 逐句学角色</h3>
+              <p className="mt-3 text-[14px] leading-[1.95] text-paper/65">
+                八幕 74 场 26 曲完整剧本。点角色名，他的台词全部凸现；背诵模式遮词逐句翻开、进度自动保存；
+                每句台词可合成朗读（播音腔），校正字音用。
+              </p>
+            </div>
+            <span
+              className="btn btn-gold shrink-0 justify-center"
+              style={{ minWidth: 180 }}
+            >
+              进入工作台 →
+            </span>
+          </div>
+        </a>
+
+        <div className="grid md:grid-cols-2 gap-6 mt-6" data-reveal>
           <a
             href="#"
             className="p-7 rounded-2xl no-underline transition-transform hover:-translate-y-1"

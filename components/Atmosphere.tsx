@@ -74,8 +74,9 @@ export default function Atmosphere() {
   useEffect(() => {
     const mq = window.matchMedia('(min-width: 768px)');
     const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    setEnabled(mq.matches && !reduce);
-    const onChange = () => setEnabled(mq.matches && !reduce);
+    const compute = () => mq.matches && !reduce && detectWebGL();
+    setEnabled(compute());
+    const onChange = () => setEnabled(compute());
     mq.addEventListener('change', onChange);
     return () => mq.removeEventListener('change', onChange);
   }, []);
@@ -137,5 +138,18 @@ class GlErrorBoundary extends Component<{ children: ReactNode }, { failed: boole
   render() {
     if (this.state.failed) return null;
     return this.props.children;
+  }
+}
+
+/** 前置探测 WebGL 支持；不支持（无 GPU / 被禁用）时不挂载 Canvas */
+function detectWebGL() {
+  try {
+    const c = document.createElement('canvas');
+    return !!(
+      window.WebGLRenderingContext &&
+      (c.getContext('webgl') || c.getContext('experimental-webgl'))
+    );
+  } catch {
+    return false;
   }
 }

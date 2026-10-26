@@ -1,15 +1,17 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
-import { SCRIPT, SONG_TITLE, ROLE_COLOR } from '@/lib/script-data';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { SCRIPT, SONG_TITLE, SONG_RAW, ROLE_COLOR } from '@/lib/script-data';
 
 /**
  * 演员工作台
  * 1) 点击角色 → 该角色全部台词凸现（其余弱化），可多选对比
  * 2) 背诵模式：选中角色的台词逐句遮罩，点击翻开，进度存本机
- * 3) 八幕导航 / 全剧本搜索 / 角色统计
+ * 3) 唱段标注：正文中唱段起始处显示「♫ 唱段X《歌名》」横幅，唱词用歌词样式
+ * 4) 逐句合成朗读：标准播音腔（浏览器 TTS 中文音色，可调语速），支持整幕连读
  */
 const PROGRESS_KEY = 'xfx-script-progress';
+const RATES = [0.8, 0.9, 1.0] as const;
 
 type ProgressMap = Record<string, Record<number, true>>;
 
@@ -29,9 +31,30 @@ export default function ScriptReader() {
   const [query, setQuery] = useState('');
   const [progress, setProgress] = useState<ProgressMap>({});
   const [revealed, setRevealed] = useState<Set<string>>(new Set());
+  // TTS
+  const [voice, setVoice] = useState<SpeechSynthesisVoice | null>(null);
+  const [rate, setRate] = useState<number>(0.9);
+  const [speaking, setSpeaking] = useState(false);
+  const [actSpeaking, setActSpeaking] = useState(false);
+  const speechRef = useRef<SpeechSynthesis | null>(null);
 
   useEffect(() => {
     setProgress(loadProgress());
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      speechRef.current = window.speechSynthesis;
+      const pick = () => {
+        const voices = window.speechSynthesis.getVoices();
+        const zh = voices.find((v) => v.lang === 'zh-CN' && /mandarin|普通话|中国大陆/i.test(v.name))
+          || voices.find((v) => v.lang === 'zh-CN')
+          || voices.find((v) => v.lang.startsWith('zh'));
+        setVoice(zh || null);
+      };
+      pick();
+      window.speechSynthesis.addEventListener('voiceschanged', pick);
+    }
+    return () => {
+      if (speechRef.current) speechRef.current.cancel();
+    };
   }, []);
 
   const meta = SCRIPT.meta;
@@ -52,7 +75,6 @@ export default function ScriptReader() {
     return SCRIPT.lines.map((line, i) => ({ line, i })).filter(({ line }) => !q || line.text.includes(q));
   }, [query]);
 
-  // 学习统计：选中角色的台词数 / 已背
   const practiceRole = selected.size === 1 ? Array.from(selected)[0] : null;
   const roleLines = useMemo(
     () => (practiceRole ? SCRIPT.lines.map((l, i) => ({ l, i })).filter(({ l }) => l.roleName === practiceRole) : []),
@@ -75,6 +97,59 @@ export default function ScriptReader() {
     roleLines.forEach(({ i }) => reveal(practiceRole!, i));
   };
 
+  /* ===== TTS ===== */
+  const cleanText = (t: string) => t.replace(/（[^）]*）/g, '').replace(/\s+/g, '').trim();
+
+  const speak = (text: string) => {
+    const s = speechRef.current;
+    if (!s || !text) return;
+    s.cancel();
+    const u = new SpeechSynthesisUtterance(cleanText(text));
+    if (voice) u.voice = voice;
+    u.lang = 'zh-CN';
+    u.rate = rate;
+    u.pitch = 1;
+    setSpeaking(true);
+    u.onend = () => setSpeaking(false);
+    u.onerror = () => setSpeaking(false);
+    s.speak(u);
+  };
+
+  const stopSpeak = () => {
+    speechRef.current?.cancel();
+    setSpeaking(false);
+    setActSpeaking(false);
+  };
+
+  const speakAct = (actId: string) => {
+    const s = speechRef.current;
+    if (!s) return;
+    s.cancel();
+    const act = SCRIPT.acts.find((a) => a.id === actId)!;
+    const queue = act.scenes
+      .flatMap((sc) => sc.lineIds.map((i) => SCRIPT.lines[i]))
+      .filter((l) => l.kind !== 'stage' && cleanText(l.text));
+    if (!queue.length) return;
+    setActSpeaking(true);
+    let idx = 0;
+    const next = () => {
+      if (!s || idx >= queue.length) {
+        setActSpeaking(false);
+        return;
+      }
+      const u = new SpeechSynthesisUtterance(cleanText(queue[idx].text));
+      if (voice) u.voice = voice;
+      u.lang = 'zh-CN';
+      u.rate = rate;
+      u.pitch = 1;
+      u.onend = () => { idx += 1; next(); };
+      u.onerror = () => { idx += 1; next(); };
+      s.speak(u);
+      idx += 1;
+    };
+    next();
+  };
+
   return (
     <div style={{ background: 'var(--paper)', color: 'var(--ink)', minHeight: '100vh', paddingTop: 88 }}>
       {/* ===== 顶栏 ===== */}
@@ -88,21 +163,51 @@ export default function ScriptReader() {
           </span>
         </div>
 
-        {/* 模式切换 */}
-        <div className="mt-5 flex items-center gap-3">
+        {/* 模式切换 + 朗读控制 */}
+        <div className="mt-5 flex items-center gap-3 flex-wrap">
           <ModeBtn active={mode === 'read'} onClick={() => setMode('read')}>阅读</ModeBtn>
           <ModeBtn active={mode === 'practice'} onClick={() => setMode('practice')}>背诵练习</ModeBtn>
           {mode === 'practice' && (
-            <span className="text-[12.5px] text-[#8A7B6B]">
-              先选一个角色，它的台词会被遮住，点击逐句翻开
-            </span>
+            <span className="text-[12.5px] text-[#8A7B6B]">先选一个角色，它的台词会被遮住，点击逐句翻开</span>
           )}
+          <span className="mx-1 text-[#C9A24B]">│</span>
+          <span className="text-[12.5px] text-[#8A7B6B]">朗读</span>
+          <button
+            onClick={() => speakAct(activeAct)}
+            disabled={actSpeaking}
+            className="px-3 py-1 rounded-full text-[12.5px] transition-all disabled:opacity-40"
+            style={{ border: '1px solid rgba(201,162,75,0.45)', color: actSpeaking ? '#8A7B6B' : '#5C4A2E', background: actSpeaking ? 'rgba(201,162,75,0.15)' : 'transparent' }}
+          >
+            {actSpeaking ? '整幕朗读中…' : '朗读整幕'}
+          </button>
+          <button onClick={stopSpeak} className="px-3 py-1 rounded-full text-[12.5px]" style={{ border: '1px solid rgba(178,58,46,0.4)', color: '#B23A2E' }}>
+            停止
+          </button>
+          <div className="flex items-center gap-1.5">
+            <span className="text-[12px] text-[#8A7B6B]">语速</span>
+            {RATES.map((r) => (
+              <button
+                key={r}
+                onClick={() => setRate(r)}
+                className="px-2.5 py-0.5 rounded-full text-[12px] transition-all"
+                style={{
+                  background: rate === r ? 'var(--ink)' : 'transparent',
+                  color: rate === r ? '#FAF6EE' : '#4A4038',
+                  border: '1px solid rgba(139,123,107,0.35)',
+                }}
+              >
+                {r}
+              </button>
+            ))}
+            {voice && <span className="text-[11px] text-[#8A7B6B]">· {voice.name}</span>}
+          </div>
+          {speaking && <span className="text-[12px] text-[#8C6F2E] animate-pulse">▶ 朗读中</span>}
         </div>
 
         {/* 角色栏：点击凸现 */}
         <div className="mt-5">
           <div className="flex items-center gap-2 mb-2">
-            <span className="text-[12px] tracking-[0.2em] text-[#8A7B6B]">点角色 → 该角色台词凸现</span>
+            <span className="text-[12px] tracking-[0.2em] text-[#8A7B6B]">点角色 → 该角色台词凸现 · 行尾喇叭可逐句朗读</span>
             {selected.size > 0 && (
               <button onClick={() => setSelected(new Set())} className="text-[12px] px-2 py-0.5 rounded-full text-[#B23A2E]" style={{ border: '1px solid rgba(178,58,46,0.4)' }}>
                 清除
@@ -131,7 +236,6 @@ export default function ScriptReader() {
             })}
           </div>
 
-          {/* 角色统计卡 */}
           {selected.size > 0 && (
             <div className="mt-3 flex flex-wrap gap-2">
               {Array.from(selected).map((name) => {
@@ -150,7 +254,6 @@ export default function ScriptReader() {
             </div>
           )}
 
-          {/* 背诵进度 */}
           {mode === 'practice' && practiceRole && (
             <div className="mt-4 px-4 py-3 rounded-xl" style={{ background: 'rgba(201,162,75,0.12)', border: '1px solid rgba(201,162,75,0.35)' }}>
               <div className="flex items-center justify-between text-[13px]">
@@ -206,7 +309,7 @@ export default function ScriptReader() {
       {/* ===== 剧本正文 ===== */}
       <div className="shell py-12">
         {searching ? (
-          <SearchResult rows={filtered} selected={selected} mode={mode} progress={progress} onReveal={reveal} />
+          <SearchResult rows={filtered} selected={selected} mode={mode} progress={progress} onReveal={reveal} onSpeak={speak} />
         ) : (
           SCRIPT.acts
             .filter((a) => a.id === activeAct)
@@ -226,28 +329,39 @@ export default function ScriptReader() {
                   )}
                 </div>
 
-                {act.scenes.map((sc) => (
-                  <div key={sc.id} className="mb-10">
-                    <div className="flex items-center gap-3 mb-4">
-                      <span className="font-cn text-[15px]" style={{ color: 'var(--vermilion)' }}>第 {sc.no} 场</span>
-                      <span className="text-[12.5px] text-[#8A7B6B]">{sc.note}</span>
+                {act.scenes.map((sc) => {
+                  let prevSong: number | null = null;
+                  return (
+                    <div key={sc.id} className="mb-10">
+                      <div className="flex items-center gap-3 mb-4">
+                        <span className="font-cn text-[15px]" style={{ color: 'var(--vermilion)' }}>第 {sc.no} 场</span>
+                        <span className="text-[12.5px] text-[#8A7B6B]">{sc.note}</span>
+                      </div>
+                      <div className="flex flex-col">
+                        {sc.lineIds.map((idx) => {
+                          const line = SCRIPT.lines[idx];
+                          const songChanged = line.songIndex != null && line.songIndex !== prevSong;
+                          if (line.songIndex != null) prevSong = line.songIndex;
+                          return (
+                            <FragmentRow key={idx} songChanged={songChanged && line.songIndex != null} songIdx={line.songIndex}>
+                              <LineRow
+                                line={line}
+                                idx={idx}
+                                selected={selected}
+                                mode={mode}
+                                progress={progress}
+                                revealed={revealed.has(`${line.roleName || ''}:${idx}`)}
+                                onReveal={reveal}
+                                onSpeak={speak}
+                                speaking={speaking}
+                              />
+                            </FragmentRow>
+                          );
+                        })}
+                      </div>
                     </div>
-                    <div className="flex flex-col">
-                      {sc.lineIds.map((idx) => (
-                        <LineRow
-                          key={idx}
-                          line={SCRIPT.lines[idx]}
-                          idx={idx}
-                          selected={selected}
-                          mode={mode}
-                          progress={progress}
-                          revealed={revealed.has(`${SCRIPT.lines[idx].roleName || ''}:${idx}`)}
-                          onReveal={reveal}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             ))
         )}
@@ -257,6 +371,21 @@ export default function ScriptReader() {
         {meta.title} · {meta.version} · 台词逐字保留原稿，仅排版
       </div>
     </div>
+  );
+}
+
+/** 唱段起始横幅 + 行（songIndex 变化时插入横幅） */
+function FragmentRow({ songChanged, songIdx, children }: { songChanged: boolean; songIdx: number | null; children: React.ReactNode }) {
+  return (
+    <>
+      {songChanged && songIdx != null && (
+        <div className="my-5 py-2.5 px-4 rounded-xl flex items-center gap-3" style={{ background: 'rgba(201,162,75,0.14)', border: '1px solid rgba(201,162,75,0.35)', borderLeft: '3px solid #C9A24B' }}>
+          <span className="text-[16px] text-[#8C6F2E]">♫</span>
+          <span className="font-cn text-[15px] tracking-[0.06em] text-[#5C4A2E]">{SONG_RAW[songIdx]}</span>
+        </div>
+      )}
+      {children}
+    </>
   );
 }
 
@@ -278,7 +407,7 @@ function ModeBtn({ active, onClick, children }: { active: boolean; onClick: () =
 
 /** 单条台词行 */
 function LineRow({
-  line, idx, selected, mode, progress, revealed, onReveal,
+  line, idx, selected, mode, progress, revealed, onReveal, onSpeak, speaking,
 }: {
   line: { kind: string; text: string; roleName?: string; songIndex: number | null };
   idx: number;
@@ -287,11 +416,14 @@ function LineRow({
   progress: ProgressMap;
   revealed: boolean;
   onReveal: (role: string, idx: number) => void;
+  onSpeak: (text: string) => void;
+  speaking: boolean;
 }) {
   const isStage = line.kind === 'stage';
+  const isSong = line.songIndex != null;
   const role = line.roleName || '';
   const on = selected.has(role);
-  const song = line.songIndex != null ? SONG_TITLE[line.songIndex] : null;
+  const song = isSong ? SONG_TITLE[line.songIndex!] : null;
   const color = ROLE_COLOR[role];
 
   // 背诵模式：选中角色的台词遮罩（未翻开）
@@ -325,11 +457,11 @@ function LineRow({
 
   return (
     <div
-      className="py-3 border-b transition-all duration-300"
+      className="py-3 border-b transition-all duration-300 group"
       style={{
         ...base,
         borderColor: 'rgba(139,123,107,0.12)',
-        background: on ? `${color}14` : 'transparent',
+        background: on ? `${color}14` : isSong ? 'rgba(201,162,75,0.04)' : 'transparent',
         borderLeft: on ? `3px solid ${color}` : '3px solid transparent',
         paddingLeft: on ? 14 : 17,
         transform: on ? 'translateX(2px)' : 'none',
@@ -340,7 +472,7 @@ function LineRow({
           （{line.text}）
         </p>
       ) : (
-        <div className="flex gap-4">
+        <div className="flex gap-4 items-start">
           <div className="shrink-0 w-[86px] pt-1">
             <span
               className="inline-block px-2.5 py-1 rounded-full text-[12px] tracking-[0.04em] transition-colors"
@@ -354,12 +486,30 @@ function LineRow({
             </span>
           </div>
           <p
-            className="text-[15.5px] leading-[1.95] flex-1 transition-all"
-            style={{ color: on ? '#1D1915' : '#2E2620', fontWeight: on ? 600 : 400, fontSize: on ? 16 : 15.5 }}
+            className="flex-1 leading-[2] transition-all"
+            style={{
+              color: on ? '#1D1915' : isSong ? '#4A3A26' : '#2E2620',
+              fontWeight: on ? 600 : 400,
+              fontSize: on ? 16 : isSong ? 15 : 15.5,
+              fontStyle: isSong ? 'italic' : 'normal',
+              fontFamily: isSong ? 'var(--font-cn), serif' : 'inherit',
+            }}
           >
             {line.text}
             {song && <span className="ml-2.5 text-[12px] text-[#8C6F2E]">♪《{song}》</span>}
           </p>
+          {/* 逐句朗读 */}
+          {!isStage && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onSpeak(line.text); }}
+              title="朗读这句"
+              aria-label="朗读这句"
+              className="shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-[13px] transition-all opacity-40 hover:opacity-100"
+              style={{ border: '1px solid rgba(201,162,75,0.4)', color: speaking ? '#B23A2E' : '#8C6F2E', background: 'rgba(250,246,238,0.6)' }}
+            >
+              {speaking ? '⏸' : '▶'}
+            </button>
+          )}
         </div>
       )}
     </div>
@@ -368,13 +518,14 @@ function LineRow({
 
 /** 搜索命中结果：按幕分组 */
 function SearchResult({
-  rows, selected, mode, progress, onReveal,
+  rows, selected, mode, progress, onReveal, onSpeak,
 }: {
   rows: { line: { actId: string; kind: string; text: string; roleName?: string; songIndex: number | null }; i: number }[];
   selected: Set<string>;
   mode: 'read' | 'practice';
   progress: ProgressMap;
   onReveal: (role: string, idx: number) => void;
+  onSpeak: (text: string) => void;
 }) {
   const grouped = new Map<string, typeof rows>();
   for (const r of rows) {
@@ -389,7 +540,7 @@ function SearchResult({
           <div key={actId}>
             <h3 className="font-cn text-[20px] mb-4">{act.num} · {act.title}</h3>
             {list.map(({ line, i }) => (
-              <LineRow key={i} line={line} idx={i} selected={selected} mode={mode} progress={progress} revealed={false} onReveal={onReveal} />
+              <LineRow key={i} line={line} idx={i} selected={selected} mode={mode} progress={progress} revealed={false} onReveal={onReveal} onSpeak={onSpeak} speaking={false} />
             ))}
           </div>
         );

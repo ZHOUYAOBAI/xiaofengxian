@@ -42,6 +42,7 @@ export interface LineItem {
 export interface SongItem {
   index: number;
   title: string;
+  rawTitle?: string;
   vocal: string;
   hasLyrics: boolean;
 }
@@ -69,6 +70,11 @@ export const SCRIPT = raw as ScriptData;
 /** 唱词：歌曲标题 map（songIndex → 歌名） */
 export const SONG_TITLE: Record<number, string> = Object.fromEntries(
   SCRIPT.songs.map((s) => [s.index, s.title])
+);
+
+/** 唱段原始标题（如「唱段一《你》」），正文唱段横幅用 */
+export const SONG_RAW: Record<number, string> = Object.fromEntries(
+  SCRIPT.songs.map((s) => [s.index, s.rawTitle || `唱段《${s.title}》`])
 );
 
 /** 角色名 → 颜色 */
