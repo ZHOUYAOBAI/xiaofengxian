@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>导演工作台 · 《蔡锷与小凤仙》</title>
+<meta name="description" content="《蔡锷与小凤仙》导演工作台：排练进度、场记、待办、到场状态与通告单生成。">
+<meta name="theme-color" content="#0E1F1B">
+<link rel="stylesheet" href="css/tokens.css">
+<link rel="stylesheet" href="css/base.css">
+<link rel="stylesheet" href="css/components.css">
+<link rel="stylesheet" href="css/pages.css">
+</head>
+<body>
+
+<header class="site-head is-light" id="site-head">
+  <div class="wrap bar">
+    <a href="index.html" class="brand">蔡锷与小凤仙<small>导演工作台</small></a>
+    <button class="nav-toggle" id="nav-toggle" aria-expanded="false" aria-controls="site-nav" aria-label="展开导航">☰</button>
+    <nav class="nav" id="site-nav" aria-label="主导航">
+      <a href="index.html">返回前台</a>
+      <a href="script.html">我的剧本</a>
+      <a href="index.html#showings" class="nav-cta">演出预约</a>
+    </nav>
+  </div>
+</header>
+
+<main class="section-tight bg-paper">
+  <div class="wrap-wide">
+    <div class="sec-head" style="margin-bottom:28px">
+      <span class="t-kicker">DIRECTOR DESK</span>
+      <h1 class="t-h1">导演工作台</h1>
+      <p class="t-lead">
+        排练进度、演员到场、场记、待办与通告单。
+        数据保存在本机浏览器，可导出后在其它设备导入。
+      </p>
+    </div>
+
+    <div class="dv-shell">
+      <nav class="dv-nav" id="dv-nav" aria-label="工作台模块">
+        <button data-tab="overview" class="is-active">总览</button>
+        <button data-tab="progress">排练进度</button>
+        <button data-tab="attendance">演员到场</button>
+        <button data-tab="notes">场记</button>
+        <button data-tab="todos">待办</button>
+        <button data-tab="notice">通告单</button>
+        <button data-tab="reviews">投递与留言</button>
+        <button data-tab="data">数据管理</button>
+      </nav>
+
+      <div class="dv-panel" id="dv-panel"></div>
+    </div>
+  </div>
+</main>
+
+<footer class="site-foot grain" style="position:relative">
+  <div class="wrap">
+    <div class="foot-bottom" style="margin:0;padding-top:0;border:0">
+      <span>《蔡锷与小凤仙》庭院音乐剧 · 2026 年 8 月修订版</span>
+      <span>数据保存在本机浏览器 · 请定期导出备份</span>
+    </div>
+  </div>
+</footer>
+
+<div class="toast-wrap" id="toast-wrap" aria-live="polite"></div>
+
+<script src="js/store.js"></script>
+<script src="js/motion.js"></script>
+<script src="js/director.js"></script>
+</body>
+</html>

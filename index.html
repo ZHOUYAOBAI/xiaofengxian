@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>蔡锷与小凤仙 · 庭院音乐剧 | 云南钟声音乐制作有限公司</title>
+<meta name="description" content="《蔡锷与小凤仙》庭院音乐剧，1915 年昆明，八大胡同的一场护国棋局。六幕二十八曲，驻场演出每月一场，观众可在线预约。">
+<meta name="theme-color" content="#0E1F1B">
+<meta property="og:title" content="蔡锷与小凤仙 · 庭院音乐剧">
+<meta property="og:description" content="从遇、识、计、机到离——六幕之间，一对水火难容的男女，在红灯笼与哑声笑语之间，演了一场惊天动地的革命。">
+<meta property="og:type" content="website">
+<meta property="og:image" content="assets/img-finale.webp">
+<link rel="preload" as="image" href="assets/img-stage-night.webp">
+<link rel="stylesheet" href="css/tokens.css">
+<link rel="stylesheet" href="css/base.css">
+<link rel="stylesheet" href="css/components.css">
+<link rel="stylesheet" href="css/pages.css">
+</head>
+<body>
+
+<a href="#main" class="sr-only">跳到主要内容</a>
+
+<!-- ================= 顶栏 ================= -->
+<header class="site-head" id="site-head">
+  <div class="wrap bar">
+    <a href="#" class="brand">蔡锷与小凤仙<small>庭院音乐剧</small></a>
+    <button class="nav-toggle" id="nav-toggle" aria-expanded="false" aria-controls="site-nav" aria-label="展开导航">☰</button>
+    <nav class="nav" id="site-nav" aria-label="主导航">
+      <a href="#story">这出戏</a>
+      <a href="#cast">角色</a>
+      <a href="#showings">来看戏</a>
+      <a href="#listen">原声</a>
+      <a href="#join">加入我们</a>
+      <a href="#studio" class="nav-cta">我的剧场</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+
+<!-- ================= 首屏 ================= -->
+<section class="hero">
+  <div class="hero-bg" aria-hidden="true"></div>
+  <div class="wrap hero-in">
+    <div class="hero-grid">
+      <div>
+        <div class="hero-kicker" data-hero>1915 · 昆明 · 八大胡同</div>
+        <h1 data-hero>蔡锷与<em>小凤仙</em></h1>
+        <p class="hero-lede" data-hero>
+          从遇、识、计、机到离——六幕之间，一对水火难容的男女，
+          在红灯笼与哑声笑语之间，演了一场惊天动地的革命。
+        </p>
+        <div class="hero-actions" data-hero>
+          <a href="#showings" class="btn btn-primary">查看本月场次</a>
+          <a href="#story" class="btn btn-on-dark">认识这出戏</a>
+        </div>
+        <div class="hero-facts" data-hero>
+          <div><div class="k">体裁</div><div class="v">庭院音乐剧<small>实景演出</small></div></div>
+          <div><div class="k">规模</div><div class="v">六幕<small>二十八曲</small></div></div>
+          <div><div class="k">时长</div><div class="v">150<small>分钟</small></div></div>
+          <div><div class="k">驻场</div><div class="v">每月<small>一场</small></div></div>
+        </div>
+      </div>
+
+      <!-- 错位悬浮的场次卡 -->
+      <aside class="hero-card" data-hero aria-label="近期演出场次">
+        <div class="hc-h">
+          <b>近期演出</b>
+          <span id="hero-month"></span>
+        </div>
+        <div id="hero-showings">
+          <div class="skeleton" style="height:56px;margin-bottom:12px"></div>
+          <div class="skeleton" style="height:56px"></div>
+        </div>
+        <a href="#showings" class="link" style="display:inline-block;margin-top:18px;font-size:13.5px">全部场次与预约 →</a>
+      </aside>
+    </div>
+  </div>
+  <div class="scroll-hint" aria-hidden="true"><span>SCROLL</span>↓</div>
+</section>
+
+<!-- ================= 剧目叙事 ================= -->
+<section class="section bg-paper" id="story">
+  <div class="wrap">
+    <div class="sec-head" data-reveal>
+      <span class="t-kicker">THE STORY</span>
+      <h2 class="t-h1">八大胡同里的<span class="hl">护国棋局</span></h2>
+      <p class="t-lead">
+        1913 年，二次革命后，蔡锷以「请假调养」之名离滇赴京。
+        他以为这是更大舞台的起点，却不知道等待他的是一间密室、一道劝进表，
+        以及一个在胡同里卖唱的女子。
+      </p>
+    </div>
+
+    <div class="act-flow" id="act-flow"><!-- JS 渲染 --></div>
+  </div>
+</section>
+
+<!-- ================= 全幅图叠加 ================= -->
+<section class="fullbleed" aria-label="剧目氛围">
+  <img src="assets/img-courtyard-scene.webp" alt="马家大院庭院，剧组排练中的灯光与布景" loading="lazy" width="447" height="670">
+  <div class="wrap fb-in">
+    <span class="t-kicker on-dark">TWO SPACES</span>
+    <h2 class="t-h1">高台之上，是大总统的棋局；<br>院落深处，是一个女子的心事。</h2>
+    <p>两个空间，两种心境。同一个蔡锷，在两处之间来回奔走——
+       台上谈的是共和与国体，台下听的是唱词与一段不肯明说的情。</p>
+  </div>
+</section>
+
+<!-- ================= 人物谱 ================= -->
+<section class="section bg-paper2" id="cast">
+  <div class="wrap">
+    <div class="sec-head" data-reveal>
+      <span class="t-kicker">THE CAST</span>
+      <h2 class="t-h1">八个人，一盘<span class="hl">没下完的棋</span></h2>
+      <p class="t-lead">
+        蔡锷是执棋者，小凤仙是他唯一没算到的变数。
+        剩下的六个人——监视的、撮合的、阻拦的、看着的——各自站在自己的立场上，
+        把这对男女推向那个雨夜。
+      </p>
+    </div>
+
+    <div class="cast-lead" id="cast-lead" data-reveal></div>
+    <div class="cast-rest" id="cast-rest" data-reveal></div>
+  </div>
+</section>
+
+<!-- ================= 引言 ================= -->
+<section class="section-tight bg-ink grain on-dark" style="position:relative">
+  <div class="wrap">
+    <blockquote class="pullquote" data-reveal>
+      <p class="q">不信美女终薄命，<br>自古侠女出风尘。</p>
+      <p class="by">小凤仙 · 二幕</p>
+    </blockquote>
+  </div>
+</section>
+
+<!-- ================= 演出场次 ================= -->
+<section class="section bg-paper" id="showings">
+  <div class="wrap">
+    <div class="sec-head" data-reveal>
+      <span class="t-kicker">SHOWINGS</span>
+      <h2 class="t-h1">本月<span class="hl">演出场次</span></h2>
+      <p class="t-lead">
+        驻场演出，每月一场。选一场，把这出戏看完。
+      </p>
+    </div>
+    <div class="showing-grid" id="showing-grid" data-reveal></div>
+    <p class="t-small" style="margin-top:22px" id="booking-note" hidden></p>
+  </div>
+</section>
+
+<!-- ================= 观剧指南 ================= -->
+<section class="section bg-paper2" id="guide">
+  <div class="wrap">
+    <div class="sec-head" data-reveal>
+      <span class="t-kicker">GUIDE</span>
+      <h2 class="t-h1">来看戏之前</h2>
+    </div>
+    <div class="guide-grid" id="guide-grid" data-reveal></div>
+  </div>
+</section>
+
+<!-- ================= 原声试听 ================= -->
+<section class="section bg-ink grain on-dark" id="listen" style="position:relative">
+  <div class="wrap">
+    <div class="sec-head" data-reveal>
+      <span class="t-kicker on-dark">ORIGINAL SOUND</span>
+      <h2 class="t-h1">七首<span class="hl-gold">必听</span></h2>
+      <p class="t-lead">原唱实录音频，未经压缩处理。同一角色不同版本的演绎，值得对照听。</p>
+    </div>
+    <div class="audio-list" id="audio-list" data-reveal></div>
+    <p class="t-small" style="margin-top:20px;color:var(--on-dark-3)">
+      单曲循环开启后，同一时刻只会有一个曲目在播。
+    </p>
+  </div>
+</section>
+
+<!-- ================= 曲谱画廊 ================= -->
+<section class="section bg-paper" id="gallery">
+  <div class="wrap">
+    <div class="sec-head" data-reveal>
+      <span class="t-kicker">SCORE GALLERY</span>
+      <h2 class="t-h1">二十八首<span class="hl">曲谱</span></h2>
+      <p class="t-lead">排练用谱，按场次归档。点击放大查看。</p>
+    </div>
+    <div class="gallery-grid" id="gallery-grid" data-reveal></div>
+  </div>
+</section>
+
+<!-- ================= 加入我们 ================= -->
+<section class="section bg-ink grain on-dark" id="join" style="position:relative">
+  <div class="wrap">
+    <div class="sec-head" data-reveal>
+      <span class="t-kicker on-dark">JOIN US</span>
+      <h2 class="t-h1">马家大院，还<span class="hl-gold">缺几个人</span></h2>
+      <p class="t-lead">
+        庭院音乐剧需要能唱、能演、能在户外实景里稳定发挥的演员。
+        每周至少三个整排练日——这是唯一的硬条件。
+      </p>
+    </div>
+
+    <div class="join-grid">
+      <div data-reveal>
+        <h3 class="t-h2" style="margin-bottom:20px">当前开放的角色</h3>
+        <div class="role-open-list" id="role-open-list"></div>
+        <div class="rule" style="margin:28px 0"></div>
+        <h3 class="t-h2" style="margin-bottom:16px">三步投递</h3>
+        <ol class="step-list" id="step-list"></ol>
+      </div>
+
+      <div class="join-form-wrap" data-reveal>
+        <form id="apply-form" class="stack-4" novalidate>
+          <h3 class="t-h2">在线投递</h3>
+          <div class="field">
+            <label for="ap-name">姓名 *</label>
+            <input class="input" type="text" id="ap-name" name="name" required placeholder="你的姓名">
+          </div>
+          <div class="field">
+            <label for="ap-contact">联系方式 *</label>
+            <input class="input" type="text" id="ap-contact" name="contact" required placeholder="手机号或邮箱">
+            <div class="hint">只用于回复你本人，不会公开。</div>
+          </div>
+          <div class="field">
+            <label for="ap-role">应聘角色 *</label>
+            <select class="select" id="ap-role" name="role" required>
+              <option value="">请选择…</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="ap-video">自荐视频链接</label>
+            <input class="input" type="url" id="ap-video" name="video" placeholder="https://…">
+            <div class="hint">网盘或视频直链均可，未填视为暂无。</div>
+          </div>
+          <div class="field">
+            <label for="ap-note">补充说明</label>
+            <textarea class="textarea" id="ap-note" name="note" placeholder="过往演出经历、可排练时间、擅长曲目…"></textarea>
+          </div>
+          <button type="submit" class="btn btn-primary" style="width:100%">提交投递</button>
+          <p class="t-small" id="apply-status" style="margin-top:4px"></p>
+        </form>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= 留言 ================= -->
+<section class="section bg-paper2" id="message">
+  <div class="wrap-narrow">
+    <div class="sec-head" data-reveal>
+      <span class="t-kicker">MESSAGE</span>
+      <h2 class="t-h1">给我们<span class="hl">留句话</span></h2>
+      <p class="t-lead">关于这出戏、关于演出、或者只是想问一句——都欢迎。留言经剧组审阅后公开。</p>
+    </div>
+    <form id="msg-form" class="stack-4" data-reveal novalidate>
+      <div class="field">
+        <label for="mg-name">称呼 *</label>
+        <input class="input" type="text" id="mg-name" name="name" required placeholder="怎么称呼你">
+      </div>
+      <div class="field">
+        <label for="mg-text">留言 *</label>
+        <textarea class="textarea" id="mg-text" name="text" required placeholder="想说的话…"></textarea>
+      </div>
+      <button type="submit" class="btn btn-primary">发送留言</button>
+      <p class="t-small" id="msg-status"></p>
+    </form>
+
+    <div id="msg-list" class="stack-3" style="margin-top:34px" data-reveal></div>
+  </div>
+</section>
+
+<!-- ================= 我的剧场 ================= -->
+<section class="section bg-paper" id="studio">
+  <div class="wrap">
+    <div class="sec-head" data-reveal>
+      <span class="t-kicker">MY THEATRE</span>
+      <h2 class="t-h1">我的<span class="hl">剧场</span></h2>
+      <p class="t-lead">剧组成员与导演的工作区：角色台词、我的预约、投递进度。</p>
+    </div>
+    <div class="studio-cards" data-reveal>
+      <a class="studio-card" href="script.html">
+        <div class="sc-k">演员</div>
+        <h3 class="t-h2">我的剧本</h3>
+        <p>按角色只看自己的台词，检索任意一句半词歌词直达场次。八百余行，完整排练稿。</p>
+        <span class="sc-go">进入 →</span>
+      </a>
+      <a class="studio-card" href="director.html">
+        <div class="sc-k">导演 / 制作组</div>
+        <h3 class="t-h2">导演工作台</h3>
+        <p>排练进度、场记、待办、到场状态与通告单生成。数据保存在本机浏览器。</p>
+        <span class="sc-go">进入 →</span>
+      </a>
+      <div class="studio-card is-static">
+        <div class="sc-k">观众</div>
+        <h3 class="t-h2">我的预约</h3>
+        <p id="my-bookings">还没有预约记录。到「来看戏」选一场吧。</p>
+        <a class="sc-go" href="#showings">去预约 →</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<!-- ================= 页脚 ================= -->
+<footer class="site-foot grain" style="position:relative">
+  <div class="wrap">
+    <div class="foot-grid">
+      <div>
+        <h4>剧目</h4>
+        <a href="#story">这出戏</a>
+        <a href="#cast">角色</a>
+        <a href="#gallery">曲谱</a>
+        <a href="#listen">原声</a>
+      </div>
+      <div>
+        <h4>来看戏</h4>
+        <a href="#showings">演出场次</a>
+        <a href="#guide">观剧指南</a>
+        <a href="#message">留言</a>
+      </div>
+      <div>
+        <h4>加入我们</h4>
+        <a href="#join">招角</a>
+        <a href="script.html">我的剧本</a>
+        <a href="director.html">导演工作台</a>
+      </div>
+      <div>
+        <h4>出品</h4>
+        <p>云南钟声音乐制作有限公司</p>
+        <p>昆明市 · 钱王街 马家大院</p>
+        <p>xiaofengxian@zhongsheng.com</p>
+      </div>
+    </div>
+    <div class="foot-bottom">
+      <span>《蔡锷与小凤仙》庭院音乐剧 · 2026 年 8 月修订版</span>
+      <span>本站剧本与曲谱仅供剧团内部排练使用</span>
+    </div>
+  </div>
+</footer>
+
+<!-- ================= 预约弹层 ================= -->
+<div class="modal" id="booking-modal" role="dialog" aria-modal="true" aria-labelledby="bk-title">
+  <div class="modal-box">
+    <button class="m-x" data-close aria-label="关闭">&times;</button>
+    <h3 id="bk-title">预约演出</h3>
+    <p class="m-sub" id="bk-sub"></p>
+    <form id="booking-form" class="stack-3" novalidate>
+      <div class="field">
+        <label for="bk-name">姓名 *</label>
+        <input class="input" type="text" id="bk-name" name="name" required>
+      </div>
+      <div class="field">
+        <label for="bk-contact">手机号或邮箱 *</label>
+        <input class="input" type="text" id="bk-contact" name="contact" required>
+      </div>
+      <div class="field">
+        <label for="bk-seats">预约人数</label>
+        <select class="select" id="bk-seats" name="seats">
+          <option value="1">1 位</option><option value="2">2 位</option>
+          <option value="3">3 位</option><option value="4">4 位</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="bk-note">备注</label>
+        <textarea class="textarea" id="bk-note" name="note" placeholder="需要无障碍座位、儿童票等请注明" style="min-height:80px"></textarea>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-ghost" data-close>取消</button>
+        <button type="submit" class="btn btn-primary">确认预约</button>
+      </div>
+      <p class="t-small" id="bk-status"></p>
+    </form>
+  </div>
+</div>
+
+<!-- ================= 灯箱 ================= -->
+<div class="lightbox" id="lightbox" role="dialog" aria-modal="true" aria-label="曲谱查看">
+  <button class="lb-close" data-lb="close" aria-label="关闭">&times;</button>
+  <button class="lb-nav lb-prev" data-lb="prev" aria-label="上一张">‹</button>
+  <button class="lb-nav lb-next" data-lb="next" aria-label="下一张">›</button>
+  <div>
+    <img id="lb-img" src="" alt="">
+    <p class="lb-cap" id="lb-cap"></p>
+  </div>
+</div>
+
+<div class="toast-wrap" id="toast-wrap" aria-live="polite"></div>
+
+<script src="js/store.js"></script>
+<script src="js/motion.js"></script>
+<script src="js/site.js"></script>
+</body>
+</html>
