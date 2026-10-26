@@ -15,7 +15,7 @@ rsync -a --delete out/ ./  \
   --exclude '/next.config.mjs' --exclude '/next-env.d.ts' \
   --exclude '/tsconfig.json' --exclude '/tailwind.config.ts' \
   --exclude '/postcss.config.mjs' --exclude '/.gitignore' \
-  --exclude '/使用说明.md' --exclude '/deploy.sh' --exclude '/.git'
+  --exclude '/使用说明.md' --exclude '/deploy.sh' --exclude '/.git' --exclude '/.nojekyll'
 
 echo "③ 提交并推送…"
 TOKEN=$(sed -n 's/^[[:space:]]*oauth_token:[[:space:]]*//p' ~/.config/gh/hosts.yml | head -1)
