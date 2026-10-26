@@ -1,0 +1,194 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============================================================
+   《蔡锷与小凤仙》庭院音乐剧 · 全局设计令牌
+   民国庭院沉郁叙事：深藏青底 + 哑光雅金 + 宣纸米白
+   ============================================================ */
+
+:root {
+  --ink: #0E1A24;
+  --ink-2: #16242E;
+  --ink-3: #1E303C;
+  --gold: #C9A24B;
+  --gold-soft: #D8BC7E;
+  --paper: #FAF6EE;
+  --paper-2: #F1EADC;
+  --tea: #8A7B6B;
+  --vermilion: #B23A2E;
+  --line: rgba(201, 162, 75, 0.22);
+  --line-soft: rgba(201, 162, 75, 0.12);
+  --muted: rgba(250, 246, 238, 0.55);
+  --serif: "Songti SC", "STSong", "Noto Serif SC", "Source Han Serif SC", "SimSun", serif;
+  --sans: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+}
+
+html {
+  scroll-behavior: auto;
+  -webkit-font-smoothing: antialiased;
+}
+
+html.lenis,
+html.lenis body {
+  height: auto;
+}
+.lenis.lenis-smooth {
+  scroll-behavior: auto !important;
+}
+.lenis.lenis-stopped {
+  overflow: hidden;
+}
+
+body {
+  background: var(--ink);
+  color: var(--paper);
+  font-family: var(--sans);
+  font-size: 16.5px;
+  line-height: 1.8;
+  overflow-x: hidden;
+}
+
+::selection {
+  background: rgba(201, 162, 75, 0.35);
+  color: #fff;
+}
+
+/* ---------- 标题：民国宋体，克制字重 ---------- */
+.font-cn {
+  font-family: var(--serif);
+  font-weight: 500;
+  letter-spacing: 0.06em;
+}
+
+.t-kicker {
+  font-size: 12px;
+  letter-spacing: 0.32em;
+  color: var(--gold);
+  text-transform: uppercase;
+}
+.t-kicker.on-dark {
+  color: var(--gold-soft);
+}
+
+/* ---------- 通用容器 ---------- */
+.shell {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+.section {
+  padding: 120px 0;
+  position: relative;
+}
+.section-tight {
+  padding: 96px 0;
+}
+
+.sec-head {
+  max-width: 640px;
+  margin-bottom: 64px;
+}
+.sec-head .t-title {
+  font-size: clamp(32px, 4.6vw, 52px);
+  line-height: 1.25;
+  color: var(--ink);
+  margin: 20px 0 18px;
+}
+.sec-head.on-dark .t-title {
+  color: var(--paper);
+}
+.sec-head .t-lead {
+  color: var(--tea);
+  font-size: 16.5px;
+}
+.sec-head.on-dark .t-lead {
+  color: var(--muted);
+}
+
+/* ---------- 文字入场（GSAP 接管 [data-reveal]） ---------- */
+[data-reveal] {
+  opacity: 0;
+  transform: translateY(28px);
+  will-change: opacity, transform;
+}
+[data-reveal].is-in {
+  opacity: 1;
+  transform: none;
+}
+
+/* ---------- 按钮：哑光雅金圆角，拒绝霓虹发光 ---------- */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 13px 30px;
+  border-radius: 999px;
+  font-size: 14.5px;
+  letter-spacing: 0.14em;
+  text-decoration: none;
+  transition: all 0.45s ease;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+.btn-gold {
+  background: linear-gradient(120deg, rgba(201, 162, 75, 0.16), rgba(201, 162, 75, 0.28));
+  border-color: var(--line);
+  color: var(--gold-soft);
+}
+.btn-gold:hover {
+  background: linear-gradient(120deg, rgba(201, 162, 75, 0.28), rgba(201, 162, 75, 0.4));
+  border-color: rgba(201, 162, 75, 0.5);
+  color: #fff;
+}
+.btn-paper {
+  background: var(--paper);
+  color: var(--ink);
+}
+.btn-paper:hover {
+  background: #fff;
+}
+.btn-verm {
+  background: var(--vermilion);
+  color: #FAF6EE;
+}
+.btn-verm:hover {
+  background: #C4453A;
+}
+
+.link-line {
+  color: var(--gold);
+  text-decoration: none;
+  border-bottom: 1px solid rgba(201, 162, 75, 0.4);
+  padding-bottom: 2px;
+  transition: border-color 0.3s;
+}
+.link-line:hover {
+  border-color: var(--gold);
+}
+
+/* ---------- 分隔与装饰 ---------- */
+.rule {
+  height: 1px;
+  background: var(--line);
+  border: 0;
+}
+
+/* ---------- 胶片柔光暗角（图片层） ---------- */
+.film-vignette::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse at center, transparent 55%, rgba(14, 26, 36, 0.55) 100%);
+}
+
+/* ---------- 禁用动画（移动端降级全局开关） ---------- */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
