@@ -293,8 +293,8 @@ export function MyTheatreSection() {
             style={{ background: 'var(--ink)', color: 'var(--paper)' }}
           >
             <div className="text-[11px] tracking-[0.24em] text-gold/80">演员 · 密码进入</div>
-            <h3 className="font-cn text-[20px] mt-3 text-paper">我的剧本</h3>
-            <p className="mt-3 text-[14px] leading-[1.9] text-paper/60">全剧八幕 74 场 814 条台词，按角色只看自己的台词，检索任意一句直达场次。输入演员密码进入。</p>
+            <h3 className="font-cn text-[20px] mt-3 text-paper">演员工作台</h3>
+            <p className="mt-3 text-[14px] leading-[1.9] text-paper/60">全剧八幕 74 场 26 曲完整在册：点角色名，他的台词全部凸现；背诵模式逐句翻开，进度本机保存。输入演员密码进入。</p>
             <span className="link-line inline-block mt-5 text-[13px]">进入 →</span>
           </a>
           <a
