@@ -288,24 +288,24 @@ export function MyTheatreSection() {
 
         <div className="grid md:grid-cols-3 gap-6" data-reveal>
           <a
-            href="#story"
+            href="script"
             className="p-7 rounded-2xl no-underline transition-transform hover:-translate-y-1"
             style={{ background: 'var(--ink)', color: 'var(--paper)' }}
           >
-            <div className="text-[11px] tracking-[0.24em] text-gold/80">演员</div>
+            <div className="text-[11px] tracking-[0.24em] text-gold/80">演员 · 密码进入</div>
             <h3 className="font-cn text-[20px] mt-3 text-paper">我的剧本</h3>
-            <p className="mt-3 text-[14px] leading-[1.9] text-paper/60">按角色只看自己的台词，检索任意一句半词歌词直达场次。八百余行，完整排练稿。</p>
+            <p className="mt-3 text-[14px] leading-[1.9] text-paper/60">全剧八幕 74 场 814 条台词，按角色只看自己的台词，检索任意一句直达场次。输入演员密码进入。</p>
             <span className="link-line inline-block mt-5 text-[13px]">进入 →</span>
           </a>
           <a
-            href="#story"
+            href="#"
             className="p-7 rounded-2xl no-underline transition-transform hover:-translate-y-1"
             style={{ background: 'var(--ink)', color: 'var(--paper)' }}
           >
             <div className="text-[11px] tracking-[0.24em] text-gold/80">导演 / 制作组</div>
             <h3 className="font-cn text-[20px] mt-3 text-paper">导演工作台</h3>
             <p className="mt-3 text-[14px] leading-[1.9] text-paper/60">排练进度、场记、待办、到场状态与通告单生成。数据保存在本机浏览器。</p>
-            <span className="link-line inline-block mt-5 text-[13px]">进入 →</span>
+            <span className="link-line inline-block mt-5 text-[13px]">筹备中 →</span>
           </a>
           <a
             href="#showings"

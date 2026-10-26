@@ -20,6 +20,7 @@ const COLS = [
     h: '加入我们',
     links: [
       { href: '#join', t: '招角' },
+      { href: 'script', t: '演员剧本' },
       { href: '#studio', t: '我的剧场' },
     ],
   },
