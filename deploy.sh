@@ -9,13 +9,13 @@ npm run build
 
 echo "② 同步产物到仓库根（GitHub Pages 直接服务根目录）…"
 rsync -a --delete out/ ./  \
-  --exclude 'app' --exclude 'components' --exclude 'lib' --exclude 'public' \
-  --exclude '.next' --exclude 'node_modules' --exclude 'out' \
-  --exclude 'package.json' --exclude 'package-lock.json' \
-  --exclude 'next.config.mjs' --exclude 'next-env.d.ts' \
-  --exclude 'tsconfig.json' --exclude 'tailwind.config.ts' \
-  --exclude 'postcss.config.mjs' --exclude '.gitignore' \
-  --exclude '使用说明.md' --exclude 'deploy.sh' --exclude '.git'
+  --exclude '/app' --exclude '/components' --exclude '/lib' --exclude '/public' \
+  --exclude '/.next' --exclude '/node_modules' --exclude '/out' \
+  --exclude '/package.json' --exclude '/package-lock.json' \
+  --exclude '/next.config.mjs' --exclude '/next-env.d.ts' \
+  --exclude '/tsconfig.json' --exclude '/tailwind.config.ts' \
+  --exclude '/postcss.config.mjs' --exclude '/.gitignore' \
+  --exclude '/使用说明.md' --exclude '/deploy.sh' --exclude '/.git'
 
 echo "③ 提交并推送…"
 TOKEN=$(sed -n 's/^[[:space:]]*oauth_token:[[:space:]]*//p' ~/.config/gh/hosts.yml | head -1)
