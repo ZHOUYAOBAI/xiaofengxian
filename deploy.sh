@@ -7,6 +7,9 @@ cd "$(dirname "$0")"
 echo "① 构建静态产物…"
 npm run build
 
+echo "①.5 修正子路由资源路径（assetPrefix './' 的 Next 子页 bug）…"
+python3 fix-export-paths.py
+
 echo "② 同步产物到仓库根（GitHub Pages 直接服务根目录）…"
 rsync -a --delete out/ ./  \
   --exclude '/app' --exclude '/components' --exclude '/lib' --exclude '/public' --exclude '/data' \
