@@ -9,7 +9,7 @@ npm run build
 
 echo "② 同步产物到仓库根（GitHub Pages 直接服务根目录）…"
 rsync -a --delete out/ ./  \
-  --exclude '/app' --exclude '/components' --exclude '/lib' --exclude '/public' \
+  --exclude '/app' --exclude '/components' --exclude '/lib' --exclude '/public' --exclude '/data' \
   --exclude '/.next' --exclude '/node_modules' --exclude '/out' \
   --exclude '/package.json' --exclude '/package-lock.json' \
   --exclude '/next.config.mjs' --exclude '/next-env.d.ts' \
