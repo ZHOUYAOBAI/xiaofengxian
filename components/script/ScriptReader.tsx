@@ -14,25 +14,16 @@ import { SINGING, SONG_META, isAside, isSinging, songOf } from '@/lib/song-seman
  * 左栏：模式（阅读/背诵/抽背/对手戏）、幕次、角色印章、进度、搜索
  */
 const PROGRESS_KEY = 'xfx-script-progress';
-const MASTERY_KEY = 'xfx-script-mastery';
 const STARS_KEY = 'xfx-script-stars';
+const DUET_KEY = 'xfx-script-duet';
 
 type ProgressMap = Record<string, Record<number, true>>;
-type MasteryMap = Record<string, Record<number, 'hot' | 'cold'>>;
-type Mode = 'read' | 'practice' | 'drill' | 'duet';
+type Mode = 'read' | 'duet';
 
 function loadProgress(): ProgressMap {
   try {
     if (typeof window === 'undefined') return {};
     return JSON.parse(localStorage.getItem(PROGRESS_KEY) || '{}');
-  } catch {
-    return {};
-  }
-}
-function loadMastery(): MasteryMap {
-  try {
-    if (typeof window === 'undefined') return {};
-    return JSON.parse(localStorage.getItem(MASTERY_KEY) || '{}');
   } catch {
     return {};
   }
@@ -89,15 +80,14 @@ export default function ScriptReader() {
   const [mode, setMode] = useState<Mode>('read');
   const [query, setQuery] = useState('');
   const [progress, setProgress] = useState<ProgressMap>({});
-  const [mastery, setMastery] = useState<MasteryMap>({});
   const [revealed, setRevealed] = useState<Set<string>>(new Set());
+  const [maskOn, setMaskOn] = useState(false); // 背词自测：遮住当前幕所选角色的台词
   const [stars, setStars] = useState<Set<number>>(new Set());
   const [jump, setJump] = useState<{ line?: number; song?: number } | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
   useEffect(() => {
     setProgress(loadProgress());
-    setMastery(loadMastery());
     try {
       const s = JSON.parse(localStorage.getItem(STARS_KEY) || '[]');
       setStars(new Set(Array.isArray(s) ? s : []));
@@ -134,25 +124,6 @@ export default function ScriptReader() {
   const actRoleDone = practiceRole
     ? actRoleLines.filter(({ i }) => progress[practiceRole]?.[i]).length
     : 0;
-  const roleMaster = practiceRole ? mastery[practiceRole] || {} : {};
-  const hotCount = practiceRole ? Object.values(roleMaster).filter((v) => v === 'hot').length : 0;
-  const coldCount = practiceRole ? Object.values(roleMaster).filter((v) => v === 'cold').length : 0;
-  const coldLines = practiceRole ? roleLines.filter(({ i }) => roleMaster[i] === 'cold') : [];
-
-  /* 抽背范围：默认跟当前幕（按幕排戏时不会抽到别的幕），可切全剧复习 */
-  const [drillScope, setDrillScope] = useState<'act' | 'all'>('act');
-  const drillLines = useMemo(
-    () =>
-      practiceRole
-        ? drillScope === 'act'
-          ? roleLines.filter(({ l }) => l.actId === activeAct)
-          : roleLines
-        : [],
-    [practiceRole, drillScope, roleLines, activeAct]
-  );
-  const drillHot = practiceRole ? drillLines.filter(({ i }) => roleMaster[i] === 'hot').length : 0;
-  const drillCold = practiceRole ? drillLines.filter(({ i }) => roleMaster[i] === 'cold').length : 0;
-  const drillColdLines = practiceRole ? drillLines.filter(({ i }) => roleMaster[i] === 'cold') : [];
 
   const reveal = (role: string, idx: number) => {
     setProgress((p) => {
@@ -167,26 +138,6 @@ export default function ScriptReader() {
 
   const revealAll = () => {
     actRoleLines.forEach(({ i }) => reveal(practiceRole!, i));
-  };
-
-  const markMastery = (role: string, idx: number, v: 'hot' | 'cold') => {
-    setMastery((m) => {
-      const next = { ...m, [role]: { ...(m[role] || {}), [idx]: v } };
-      try {
-        localStorage.setItem(MASTERY_KEY, JSON.stringify(next));
-      } catch {}
-      return next;
-    });
-  };
-
-  const resetMastery = (role: string) => {
-    setMastery((m) => {
-      const next = { ...m, [role]: {} };
-      try {
-        localStorage.setItem(MASTERY_KEY, JSON.stringify(next));
-      } catch {}
-      return next;
-    });
   };
 
   /* ---- 星标收藏 ---- */
@@ -337,8 +288,6 @@ export default function ScriptReader() {
               {(
                 [
                   ['read', '阅读'],
-                  ['practice', '背诵'],
-                  ['drill', '抽背'],
                   ['duet', '对手戏'],
                 ] as [Mode, string][]
               ).map(([m, label]) => (
@@ -358,10 +307,8 @@ export default function ScriptReader() {
               ))}
             </div>
             <SideHint>
-              {mode === 'read' && '点选角色 → 其台词凸现；歌与话分栏排印。'}
-              {mode === 'practice' && '选一个角色，其台词被遮住，点一句翻一句。'}
-              {mode === 'drill' && '选一个角色，逐句随机抽背，标记 熟/不熟。'}
-              {mode === 'duet' && '选两个角色，跟着对家台词接词。'}
+              {mode === 'read' && '点选角色 → 其台词高亮；同一角色连续台词只出现一次人名。'}
+              {mode === 'duet' && '选两个角色，跟着对家台词接词，练对手戏。'}
             </SideHint>
           </section>
 
@@ -505,64 +452,52 @@ export default function ScriptReader() {
             </section>
           )}
 
-          {mode === 'practice' && practiceRole && (
+          {mode === 'read' && practiceRole && (
             <section>
-              <SideTitle>背诵进度</SideTitle>
-              <div className="px-4 py-3 rounded-xl" style={{ background: 'rgba(201,162,75,0.1)', border: '1px solid rgba(201,162,75,0.3)' }}>
-                <div className="flex items-center justify-between text-[13px]">
-                  <span style={{ color: 'var(--gold-soft)' }}>
-                    <b>{practiceRole}</b> · 本幕已背 <b>{actRoleDone}</b>/{actRoleLines.length}
-                  </span>
-                  <button onClick={revealAll} className="px-3 py-1 rounded-full text-[12px]" style={{ border: '1px solid rgba(201,162,75,0.45)', color: 'var(--gold-soft)' }}>
-                    翻开全部
-                  </button>
-                </div>
-                <Bar ratio={actRoleLines.length ? actRoleDone / actRoleLines.length : 0} color="var(--gold)" />
-                {actRoleLines.length === 0 ? (
-                  <p className="mt-2 text-[11.5px]" style={{ color: 'var(--muted)' }}>
-                    本幕没有 {practiceRole} 的台词，切到其他幕试试
-                  </p>
-                ) : (
-                  <p className="mt-2 text-[11.5px]" style={{ color: 'var(--muted)' }}>
-                    全剧已背 {roleDone}/{roleLines.length} 句 · 切换幕次练习对应台词
-                  </p>
-                )}
+              <div className="mb-2.5 flex items-center justify-between">
+                <SideTitle>背词自测</SideTitle>
+                <button
+                  onClick={() => {
+                    setMaskOn(!maskOn);
+                    setRevealed(new Set());
+                  }}
+                  className="px-3 py-1 rounded-full text-[12px] transition-all"
+                  style={{
+                    background: maskOn ? 'var(--gold)' : 'transparent',
+                    color: maskOn ? '#0E1A24' : 'var(--gold-soft)',
+                    border: `1px solid ${maskOn ? 'var(--gold)' : 'rgba(201,162,75,0.45)'}`,
+                    fontWeight: maskOn ? 600 : 400,
+                  }}
+                >
+                  {maskOn ? '关闭自测' : '开启自测'}
+                </button>
               </div>
-            </section>
-          )}
-
-          {mode === 'drill' && practiceRole && (
-            <section>
-              <SideTitle>掌握进度</SideTitle>
               <div className="px-4 py-3 rounded-xl" style={{ background: 'rgba(201,162,75,0.1)', border: '1px solid rgba(201,162,75,0.3)' }}>
-                <div className="flex items-center justify-between gap-2 mb-2">
-                  <span className="text-[13px]" style={{ color: 'var(--gold-soft)' }}>
-                    <b>{practiceRole}</b> · {drillLines.length} 句
-                  </span>
-                  <div className="flex rounded-full overflow-hidden text-[11.5px]" style={{ border: '1px solid rgba(201,162,75,0.4)' }}>
-                    <button onClick={() => setDrillScope('act')} className="px-2.5 py-1 transition-colors"
-                      style={{ background: drillScope === 'act' ? 'var(--gold)' : 'transparent', color: drillScope === 'act' ? '#0E1A24' : 'var(--muted)', fontWeight: drillScope === 'act' ? 600 : 400 }}>
-                      本幕
-                    </button>
-                    <button onClick={() => setDrillScope('all')} className="px-2.5 py-1 transition-colors"
-                      style={{ background: drillScope === 'all' ? 'var(--gold)' : 'transparent', color: drillScope === 'all' ? '#0E1A24' : 'var(--muted)', fontWeight: drillScope === 'all' ? 600 : 400 }}>
-                      全剧
-                    </button>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2 text-[12.5px] mb-2" style={{ color: 'var(--muted)' }}>
-                  <Chip n={drillHot} label="已熟" c="#7FB069" />
-                  <Chip n={drillCold} label="再练" c="#E8A59B" />
-                  <Chip n={drillLines.length - drillHot - drillCold} label="未练" c="var(--muted)" />
-                </div>
-                <Bar ratio={drillLines.length ? (drillHot + drillCold) / drillLines.length : 0} color="var(--gold)" />
-                {drillScope === 'act' && drillLines.length === 0 && (
-                  <p className="mt-2 text-[11.5px]" style={{ color: 'var(--muted)' }}>本幕没有 {practiceRole} 的台词，切幕或改抽全剧。</p>
-                )}
-                {drillColdLines.length > 0 && (
-                  <button onClick={() => { if (drillColdLines[0]) jumpToLine(drillColdLines[0].i); }} className="mt-2 w-full text-[12px] text-left" style={{ color: '#E8A59B' }}>
-                    错题集 {drillColdLines.length} 句 · 跳到第一句重看 ↓
-                  </button>
+                {maskOn ? (
+                  <>
+                    <div className="flex items-center justify-between text-[13px]">
+                      <span style={{ color: 'var(--gold-soft)' }}>
+                        <b>{practiceRole}</b> · 本幕已背 <b>{actRoleDone}</b>/{actRoleLines.length}
+                      </span>
+                      <button onClick={revealAll} className="px-3 py-1 rounded-full text-[12px]" style={{ border: '1px solid rgba(201,162,75,0.45)', color: 'var(--gold-soft)' }}>
+                        翻开全部
+                      </button>
+                    </div>
+                    <Bar ratio={actRoleLines.length ? actRoleDone / actRoleLines.length : 0} color="var(--gold)" />
+                    {actRoleLines.length === 0 ? (
+                      <p className="mt-2 text-[11.5px]" style={{ color: 'var(--muted)' }}>
+                        本幕没有 {practiceRole} 的台词，切到其他幕试试
+                      </p>
+                    ) : (
+                      <p className="mt-2 text-[11.5px]" style={{ color: 'var(--muted)' }}>
+                        该角色本幕台词已遮住，点行翻开；全剧已背 {roleDone}/{roleLines.length} 句
+                      </p>
+                    )}
+                  </>
+                ) : (
+                  <p className="text-[12px] leading-relaxed" style={{ color: 'var(--muted)' }}>
+                    开启后遮住 <b style={{ color: 'var(--gold-soft)' }}>{practiceRole}</b> 在本幕的全部台词，点行翻开自测。
+                  </p>
                 )}
               </div>
             </section>
@@ -604,22 +539,15 @@ export default function ScriptReader() {
         <main className="flex-1 min-w-0 w-full">
           {mode === 'duet' ? (
             effDuet ? (
-              <DuetStage roleA={effDuet.roleA} roleB={effDuet.roleB} />
+              <DuetStage roleA={effDuet.roleA} roleB={effDuet.roleB} activeAct={activeAct} />
             ) : (
               <EmptyStage title="对手戏 · 接词排练"
                 hint="在左栏「角色」中点选两位演员（如 蔡锷 + 小凤仙），系统按剧本顺序排出对白：先亮对方台词做提示，你接自己的词，点击翻看对照。" />
             )
-          ) : mode === 'drill' ? (
-            practiceRole ? (
-              <DrillStage key={`${practiceRole}-${drillScope}-${activeAct}`} role={practiceRole} roleLines={drillLines} mastery={mastery[practiceRole] || {}} onMark={markMastery} />
-            ) : (
-              <EmptyStage title="随机抽背 · 聚光灯"
-                hint="在左栏「角色」中选一位演员（如 蔡锷），舞台灯光即起：系统随机抽一句该角色的台词，先露首字，你在心里接完，再揭晓对照，并标记 记住了 / 再练练。" />
-            )
           ) : searching ? (
-            <SearchResult rows={filtered} selected={selected} mode={mode === 'practice' ? 'practice' : 'read'} progress={progress} onReveal={reveal} />
+            <SearchResult rows={filtered} selected={selected} mask={maskOn} progress={progress} onReveal={reveal} />
           ) : (
-            <ScriptPage actId={activeAct} selected={selected} mode={mode === 'practice' ? 'practice' : 'read'} progress={progress} revealed={revealed} onReveal={reveal} stars={stars} onStar={toggleStar} />
+            <ScriptPage actId={activeAct} selected={selected} mask={maskOn} progress={progress} revealed={revealed} onReveal={reveal} stars={stars} onStar={toggleStar} />
           )}
         </main>
       </div>
@@ -691,11 +619,11 @@ function EmptyStage({ title, hint }: { title: string; hint: string }) {
 /* ================= 剧本页（语义块排版） ================= */
 
 function ScriptPage({
-  actId, selected, mode, progress, revealed, onReveal, stars, onStar,
+  actId, selected, mask, progress, revealed, onReveal, stars, onStar,
 }: {
   actId: string;
   selected: Set<string>;
-  mode: 'read' | 'practice';
+  mask: boolean;
   progress: ProgressMap;
   revealed: Set<string>;
   onReveal: (role: string, idx: number) => void;
@@ -709,7 +637,7 @@ function ScriptPage({
       <div className="mb-8 pb-5 flex flex-wrap items-end gap-x-5 gap-y-2" style={{ borderBottom: '1.5px solid var(--gold)' }}>
         <h2 className="font-cn text-[clamp(24px,3vw,32px)] tracking-[0.08em]">{act.num}{act.title ? ` ${act.title}` : ''}</h2>
         <span className="text-[12.5px]" style={{ color: 'var(--tea)' }}>
-          {act.scenes.length} 场 · {mode === 'practice' ? '背诵模式：点击遮罩行翻开' : '点选角色即可凸现其台词'}
+          {act.scenes.length} 场 · {mask ? '背词自测：点遮罩行翻开' : '点选角色即可高亮其台词'}
         </span>
       </div>
 
@@ -724,7 +652,7 @@ function ScriptPage({
           </div>
           <div className="flex flex-col">
             {buildBlocks(sc).map((b, bi) => (
-              <BlockView key={bi} b={b} selected={selected} mode={mode} progress={progress} revealed={revealed} onReveal={onReveal} stars={stars} onStar={onStar} />
+              <BlockView key={bi} b={b} selected={selected} mask={mask} progress={progress} revealed={revealed} onReveal={onReveal} stars={stars} onStar={onStar} />
             ))}
           </div>
         </div>
@@ -734,11 +662,11 @@ function ScriptPage({
 }
 
 function BlockView({
-  b, selected, mode, progress, revealed, onReveal, stars, onStar,
+  b, selected, mask, progress, revealed, onReveal, stars, onStar,
 }: {
   b: Block;
   selected: Set<string>;
-  mode: 'read' | 'practice';
+  mask: boolean;
   progress: ProgressMap;
   revealed: Set<string>;
   onReveal: (role: string, idx: number) => void;
@@ -760,7 +688,7 @@ function BlockView({
       kind={b.kind!}
       first={!!b.first}
       selected={selected}
-      mode={mode}
+      mask={mask}
       progress={progress}
       revealed={revealed.has(`${b.role || ''}:${b.idx}`)}
       onReveal={onReveal}
@@ -808,7 +736,7 @@ function SongBanner({ song, title, note, singers }: { song: number; title: strin
 
 /** 台词行：唱词（sing）与对白（talk）共用，块首带角色章、续行缩进 */
 function ScriptLine({
-  line, idx, role, kind, first, selected, mode, progress, revealed, onReveal, starred, onStar,
+  line, idx, role, kind, first, selected, mask, progress, revealed, onReveal, starred, onStar,
 }: {
   line: { text: string; songIndex: number | null };
   idx: number;
@@ -816,7 +744,7 @@ function ScriptLine({
   kind: 'sing' | 'talk';
   first: boolean;
   selected: Set<string>;
-  mode: 'read' | 'practice';
+  mask: boolean;
   progress: ProgressMap;
   revealed: boolean;
   onReveal: (role: string, idx: number) => void;
@@ -829,8 +757,8 @@ function ScriptLine({
   const color = ROLE_COLOR[role];
   const dim = selected.size > 0 && !on;
 
-  // 背诵遮罩
-  const practicing = mode === 'practice' && on && !revealed;
+  // 背词自测遮罩
+  const practicing = mask && on && !revealed;
   if (practicing) {
     const done = !!progress[role]?.[idx];
     return (
@@ -913,158 +841,22 @@ function ScriptLine({
   );
 }
 
-/* ================= 抽背模式 ================= */
-
-function DrillStage({
-  role, roleLines, mastery, onMark,
-}: {
-  role: string;
-  roleLines: { l: { text: string; sceneId: string; actId: string; songIndex: number | null }; i: number }[];
-  mastery: Record<number, 'hot' | 'cold'>;
-  onMark: (role: string, idx: number, v: 'hot' | 'cold') => void;
-}) {
-  const [cur, setCur] = useState<{ i: number } | null>(null);
-  const [revealed, setRevealed] = useState(false);
-  const prevRole = useRef<string>(role);
-
-  const untried = roleLines.filter(({ i }) => !mastery[i]);
-  const colds = roleLines.filter(({ i }) => mastery[i] === 'cold');
-  const hots = roleLines.filter(({ i }) => mastery[i] === 'hot');
-
-  const draw = (pool: typeof roleLines) => {
-    if (!pool.length) return null;
-    return pool[Math.floor(Math.random() * pool.length)];
-  };
-
-  const next = () => {
-    const pool = untried.length ? untried : colds.length ? colds : hots;
-    const d = draw(pool);
-    if (!d) return;
-    setCur(d);
-    setRevealed(false);
-  };
-
-  useEffect(() => {
-    if (prevRole.current !== role) {
-      prevRole.current = role;
-      setCur(null);
-      setRevealed(false);
-    }
-    if (!cur) next();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [role, roleLines.length]);
-
-  if (!cur) {
-    return (
-      <div className="min-h-[440px] flex items-center justify-center rounded-2xl p-10"
-        style={{ background: 'var(--ink)', border: '1px solid rgba(201,162,75,0.4)' }}>
-        <div className="text-center">
-          <div className="font-cn text-[20px] mb-4" style={{ color: 'var(--gold-soft)' }}>台词已全部过完</div>
-          <button onClick={next} className="px-8 py-3 rounded-full text-[14px] tracking-[0.12em]"
-            style={{ background: 'var(--gold)', color: '#0E1A24', fontWeight: 600 }}>
-            再抽一轮
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  const line = roleLines.find((r) => r.i === cur.i)!;
-  const text = line.l.text;
-  const scene = SCRIPT.acts.find((a) => a.id === line.l.actId)?.scenes.find((s) => s.id === line.l.sceneId);
-  const act = SCRIPT.acts.find((a) => a.id === line.l.actId);
-  const color = ROLE_COLOR[role] || 'var(--gold)';
-  let cue: { text: string; role: string } | null = null;
-  if (scene) {
-    const myIdx = scene.lineIds.indexOf(cur.i);
-    for (let k = myIdx - 1; k >= 0; k--) {
-      const prev = SCRIPT.lines[scene.lineIds[k]];
-      if (prev.kind !== 'stage' && prev.text.trim()) {
-        cue = { text: prev.text, role: prev.roleName || '台词' };
-        break;
-      }
-    }
-  }
-
-  const headChar = text.trim().charAt(0);
-  const masked = `▢`.repeat(Math.min(24, Math.max(6, text.trim().length - 1)));
-  const songIdx = songOf(cur.i);
-  const song = songIdx != null ? SONG_META[String(songIdx)] : null;
-
-  return (
-    <div className="rounded-2xl overflow-hidden" style={{ background: 'var(--ink)', border: '1px solid rgba(201,162,75,0.45)' }}>
-      <div className="px-6 py-3 flex items-center justify-between border-b" style={{ borderColor: 'rgba(201,162,75,0.25)' }}>
-        <div className="flex items-center gap-3">
-          <span className="font-cn text-[15px]" style={{ color: 'var(--gold-soft)' }}>{act?.num}{scene ? ` · 第${scene.no}场` : ''}</span>
-          {song && <span className="px-2 py-0.5 rounded-full text-[12px]" style={{ background: 'rgba(201,162,75,0.18)', color: 'var(--gold-soft)' }}>♪《{song.title}》</span>}
-        </div>
-        <span className="text-[12px]" style={{ color: 'var(--muted)' }}>{role} 剩余未练 {untried.length} 句</span>
-      </div>
-
-      <div className="px-6 py-10">
-        {cue ? (
-          <div className="mb-6 px-4 py-2.5 rounded-lg text-[13px] italic leading-relaxed"
-            style={{ background: 'rgba(250,246,238,0.05)', color: 'var(--muted)', borderLeft: '2px solid rgba(201,162,75,0.4)' }}>
-            上句 · {cue.role}：{cue.text.length > 42 ? cue.text.slice(0, 42) + '…' : cue.text}
-          </div>
-        ) : (
-          <div className="mb-6 px-4 py-2.5 rounded-lg text-[13px] italic leading-relaxed"
-            style={{ background: 'rgba(250,246,238,0.05)', color: 'var(--muted)', borderLeft: '2px solid rgba(201,162,75,0.4)' }}>
-            {act?.num} 第{scene?.no}场 · 开场（没有上一句，直接接）
-          </div>
-        )}
-
-        <div className="relative px-8 py-9 rounded-xl text-center" style={{ background: 'var(--ink-2)', border: '1px solid rgba(201,162,75,0.35)' }}>
-          <div className="mb-3 flex items-center justify-center gap-2">
-            <Seal text={role} color={color} />
-          </div>
-          {revealed ? (
-            <p className="font-cn text-[clamp(17px,2vw,22px)] leading-[2] tracking-[0.05em]" style={{ color: 'var(--paper)' }}>{text}</p>
-          ) : (
-            <p className="font-cn text-[clamp(17px,2vw,22px)] leading-[2] tracking-[0.05em]" style={{ color: 'var(--gold-soft)' }}>
-              {headChar}<span style={{ color: 'rgba(201,162,75,0.35)', letterSpacing: '0.14em' }}>{masked}</span>
-            </p>
-          )}
-          <p className="mt-4 text-[12px] tracking-[0.2em]" style={{ color: 'var(--muted)' }}>
-            {revealed ? '对照原文 · 在心里再过一遍' : '首字已亮 · 在心里把整句接完，再点揭晓'}
-          </p>
-        </div>
-      </div>
-
-      <div className="px-6 pb-7 flex flex-wrap items-center justify-center gap-3">
-        {!revealed ? (
-          <button onClick={() => setRevealed(true)} className="px-8 py-3 rounded-full text-[14px] tracking-[0.14em]"
-            style={{ background: 'var(--gold)', color: '#0E1A24', fontWeight: 600 }}>
-            揭晓
-          </button>
-        ) : (
-          <>
-            <button onClick={() => { onMark(role, cur.i, 'hot'); next(); }} className="px-6 py-3 rounded-full text-[14px] tracking-[0.1em]"
-              style={{ background: '#7FB069', color: '#0E1A24', fontWeight: 600 }}>
-              记住了 ✓
-            </button>
-            <button onClick={() => { onMark(role, cur.i, 'cold'); next(); }} className="px-6 py-3 rounded-full text-[14px] tracking-[0.1em]"
-              style={{ background: 'var(--vermilion)', color: '#FAF6EE', fontWeight: 600 }}>
-              再练练 ✗
-            </button>
-            <button onClick={() => { onMark(role, cur.i, 'hot'); setRevealed(true); }} className="px-4 py-3 rounded-full text-[13px]"
-              style={{ border: '1px solid rgba(250,246,238,0.3)', color: 'var(--muted)' }}>
-              重抽一句
-            </button>
-          </>
-        )}
-      </div>
-    </div>
-  );
-}
-
 /* ================= 对手戏 ================= */
 
-function DuetStage({ roleA, roleB }: { roleA: string; roleB: string }) {
-  const [turned, setTurned] = useState<Set<number>>(new Set());
+function DuetStage({ roleA, roleB, activeAct }: { roleA: string; roleB: string; activeAct: string }) {
+  const [scope, setScope] = useState<'act' | 'all'>('act'); // 对手戏默认练当前幕
+  const duetKey = `duet:${roleA}→${roleB}`;
+  const [turned, setTurned] = useState<Set<number>>(() => {
+    try {
+      const s = JSON.parse(localStorage.getItem(DUET_KEY) || '{}');
+      return new Set(Array.isArray(s[duetKey]) ? s[duetKey] : []);
+    } catch {
+      return new Set();
+    }
+  });
 
-  const pairs = useMemo(() => {
-    const out: { cue: string; cueRole: string; text: string; actNum: string; sceneNo: number }[] = [];
+  const allPairs = useMemo(() => {
+    const out: { cue: string; cueRole: string; text: string; actNum: string; sceneNo: number; actId: string }[] = [];
     for (const act of SCRIPT.acts) {
       for (const sc of act.scenes) {
         let lastAny: { text: string; role: string } | null = null;
@@ -1077,13 +869,13 @@ function DuetStage({ roleA, roleB }: { roleA: string; roleB: string }) {
           if (ln.roleName === roleB) {
             if (lastB) {
               // 自己连说：cue 应是自己的上一句，而非更早的对方旧词
-              out.push({ cue: lastB.text, cueRole: `${roleB}·连说`, text: ln.text, actNum: act.num, sceneNo: sc.no });
+              out.push({ cue: lastB.text, cueRole: `${roleB}·连说`, text: ln.text, actNum: act.num, sceneNo: sc.no, actId: act.id });
             } else if (lastA) {
-              out.push({ cue: lastA.text, cueRole: roleA, text: ln.text, actNum: act.num, sceneNo: sc.no });
+              out.push({ cue: lastA.text, cueRole: roleA, text: ln.text, actNum: act.num, sceneNo: sc.no, actId: act.id });
             } else if (lastAny) {
-              out.push({ cue: lastAny.text, cueRole: lastAny.role, text: ln.text, actNum: act.num, sceneNo: sc.no });
+              out.push({ cue: lastAny.text, cueRole: lastAny.role, text: ln.text, actNum: act.num, sceneNo: sc.no, actId: act.id });
             } else {
-              out.push({ cue: '', cueRole: '', text: ln.text, actNum: act.num, sceneNo: sc.no });
+              out.push({ cue: '', cueRole: '', text: ln.text, actNum: act.num, sceneNo: sc.no, actId: act.id });
             }
           }
           if (ln.roleName === roleB) lastB = { text: ln.text };
@@ -1098,7 +890,29 @@ function DuetStage({ roleA, roleB }: { roleA: string; roleB: string }) {
     return out;
   }, [roleA, roleB]);
 
-  const turn = (k: number) => setTurned((t) => new Set(t).add(k));
+  const pairs = useMemo(
+    () => (scope === 'act' ? allPairs.filter((p) => p.actId === activeAct) : allPairs),
+    [allPairs, scope, activeAct]
+  );
+
+  const saveTurned = (next: Set<number>) => {
+    try {
+      const all = JSON.parse(localStorage.getItem(DUET_KEY) || '{}');
+      all[duetKey] = [...next];
+      localStorage.setItem(DUET_KEY, JSON.stringify(all));
+    } catch {}
+  };
+  const turn = (k: number) => {
+    setTurned((t) => {
+      const next = new Set(t).add(k);
+      saveTurned(next);
+      return next;
+    });
+  };
+  const resetAll = () => {
+    setTurned(new Set());
+    saveTurned(new Set());
+  };
   const colorB = ROLE_COLOR[roleB] || 'var(--gold)';
 
   return (
@@ -1108,11 +922,28 @@ function DuetStage({ roleA, roleB }: { roleA: string; roleB: string }) {
         <Seal text={roleB} color={colorB} />
         <span style={{ color: 'var(--tea)' }}>共 {pairs.length} 句对白 · 已接 {turned.size} 句</span>
         <div className="w-40"><Bar ratio={pairs.length ? turned.size / pairs.length : 0} color="var(--gold)" /></div>
+        <div className="flex rounded-full overflow-hidden text-[12px]" style={{ border: '1px solid rgba(201,162,75,0.4)' }}>
+          <button onClick={() => setScope('act')} className="px-3 py-1"
+            style={{ background: scope === 'act' ? 'var(--gold)' : 'transparent', color: scope === 'act' ? '#0E1A24' : 'var(--muted)', fontWeight: scope === 'act' ? 600 : 400 }}>
+            本幕
+          </button>
+          <button onClick={() => setScope('all')} className="px-3 py-1"
+            style={{ background: scope === 'all' ? 'var(--gold)' : 'transparent', color: scope === 'all' ? '#0E1A24' : 'var(--muted)', fontWeight: scope === 'all' ? 600 : 400 }}>
+            全剧
+          </button>
+        </div>
+        {turned.size > 0 && (
+          <button onClick={resetAll} className="px-3 py-1 rounded-full text-[12px]" style={{ border: '1px solid rgba(232,165,155,0.5)', color: '#E8A59B' }}>
+            重新练
+          </button>
+        )}
       </div>
 
       {pairs.length === 0 ? (
         <div className="px-6 py-10 rounded-2xl text-center text-[14px]" style={{ background: 'var(--paper-2)', color: 'var(--tea)' }}>
-          这两位在戏里没有直接对白，换一对试试。
+          {scope === 'act'
+            ? `本幕没有 ${roleB} 的对白，切到别的幕，或点「全剧」练全部。`
+            : '这两位在戏里没有直接对白，换一对试试。'}
         </div>
       ) : (
         pairs.map((p, k) => {
@@ -1156,11 +987,11 @@ function DuetStage({ roleA, roleB }: { roleA: string; roleB: string }) {
 /* ================= 搜索结果 ================= */
 
 function SearchResult({
-  rows, selected, mode, progress, onReveal,
+  rows, selected, mask, progress, onReveal,
 }: {
   rows: { line: { actId: string; kind: string; text: string; roleName?: string; songIndex: number | null }; i: number }[];
   selected: Set<string>;
-  mode: 'read' | 'practice';
+  mask: boolean;
   progress: ProgressMap;
   onReveal: (role: string, idx: number) => void;
 }) {
@@ -1179,7 +1010,7 @@ function SearchResult({
               {act.num} · {act.title || ''} <span className="text-[12px]" style={{ color: 'var(--tea)' }}>{list.length} 句</span>
             </h3>
             {list.map(({ line, i }) => (
-              <SearchLine key={i} line={line} idx={i} selected={selected} mode={mode} progress={progress} onReveal={onReveal} />
+              <SearchLine key={i} line={line} idx={i} selected={selected} mask={mask} progress={progress} onReveal={onReveal} />
             ))}
           </div>
         );
@@ -1189,12 +1020,12 @@ function SearchResult({
 }
 
 function SearchLine({
-  line, idx, selected, mode, progress, onReveal,
+  line, idx, selected, mask, progress, onReveal,
 }: {
   line: { kind: string; text: string; roleName?: string; songIndex: number | null };
   idx: number;
   selected: Set<string>;
-  mode: 'read' | 'practice';
+  mask: boolean;
   progress: ProgressMap;
   onReveal: (role: string, idx: number) => void;
 }) {
@@ -1205,13 +1036,14 @@ function SearchLine({
   const color = ROLE_COLOR[role];
   if (line.kind === 'stage') return <StageNote text={line.text} />;
   if (isAsd) return <AsideNote text={line.text} />;
-  if (mode === 'practice' && on) {
+  if (mask && on) {
+    const done = !!progress[role]?.[idx];
     return (
       <button onClick={() => onReveal(role, idx)} data-line={idx}
         className="w-full text-left py-3 border-b flex items-center gap-4"
         style={{ borderColor: 'rgba(139,123,107,0.14)', background: 'rgba(139,123,107,0.05)' }}>
         <span className="w-[64px] shrink-0 px-2 py-1 rounded-md text-[12px] text-center font-cn" style={{ background: color || '#C9A24B', color: '#FAF6EE' }}>{role}</span>
-        <span className="text-[14px]" style={{ color: 'var(--tea)' }}>▢▢ 背诵中 · 点击翻开</span>
+        <span className="text-[14px]" style={{ color: 'var(--tea)' }}>{done ? '已背 ✓ · 再点温习' : '▢▢ 自测中 · 点击翻开 ▢▢'}</span>
       </button>
     );
   }
