@@ -12,6 +12,7 @@ export type TTSConfig = {
   apiKey: string;
   voice: string; // voice_type 代号
   voiceName: string;
+  proxyUrl?: string; // 可选：Cloudflare Worker 中转地址（绕过火山 CORS 限制）
 };
 
 const KEY = 'xfx-huoshan-tts-v2';
@@ -56,7 +57,7 @@ export function loadTTSConfig(): TTSConfig | null {
     const raw = localStorage.getItem(KEY);
     if (!raw) return null;
     const c = JSON.parse(raw);
-    return c && c.apiKey ? c : null;
+    return c && (c.apiKey || c.proxyUrl) ? c : null;
   } catch {
     return null;
   }
@@ -76,12 +77,47 @@ function uuid(): string {
 }
 
 /**
- * 调用豆包语音合成大模型2.0（HTTP Chunked 流式）。
- * 返回 mp3 的 objectURL；失败返回 null。
- * 带 12 秒超时：网络卡住时快速失败，让调用方回退系统语音，避免“没声音”。
+ * 调用豆包语音合成大模型2.0。
+ * 优先走 Cloudflare Worker 中转（proxyUrl），可绕过火山 CORS 限制；
+ * 未配置中转时直连火山（仅当火山 CORS 放行新版头时有效）。
+ * 返回 mp3 的 objectURL；失败返回 null。带 12 秒超时。
  */
 export async function synthesize(text: string, cfg: TTSConfig): Promise<string | null> {
   if (!text || !cfg) return null;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 12000);
+
+  // 中转模式：Worker 转发（服务端调用，无 CORS 问题）
+  if (cfg.proxyUrl) {
+    try {
+      const base = cfg.proxyUrl.replace(/\/+$/, '');
+      const res = await fetch(`${base}/tts`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text, speaker: cfg.voice }),
+        signal: controller.signal,
+      });
+      clearTimeout(timer);
+      if (!res.ok) {
+        let msg = `中转HTTP ${res.status}`;
+        try { const j = await res.json(); if (j && j.error) msg += ' ' + j.error; } catch {}
+        console.warn('[HuoshanTTS] proxy', msg);
+        return null;
+      }
+      const blob = await res.blob();
+      if (!blob || blob.size < 100) {
+        console.warn('[HuoshanTTS] proxy 空音频');
+        return null;
+      }
+      return URL.createObjectURL(blob);
+    } catch (e) {
+      clearTimeout(timer);
+      console.warn('[HuoshanTTS] proxy network', e);
+      return null;
+    }
+  }
+
+  // 直连模式（火山 CORS 未放行新版头时浏览器必失败，保留作 fallback）
   const body = {
     req_params: {
       text,
@@ -89,8 +125,6 @@ export async function synthesize(text: string, cfg: TTSConfig): Promise<string |
       audio_params: { format: 'mp3', sample_rate: 24000 },
     },
   };
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 12000);
   try {
     const res = await fetch('https://openspeech.bytedance.com/api/v3/tts/unidirectional', {
       method: 'POST',
