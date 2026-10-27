@@ -78,6 +78,7 @@ function uuid(): string {
 /**
  * 调用豆包语音合成大模型2.0（HTTP Chunked 流式）。
  * 返回 mp3 的 objectURL；失败返回 null。
+ * 带 12 秒超时：网络卡住时快速失败，让调用方回退系统语音，避免“没声音”。
  */
 export async function synthesize(text: string, cfg: TTSConfig): Promise<string | null> {
   if (!text || !cfg) return null;
@@ -88,6 +89,8 @@ export async function synthesize(text: string, cfg: TTSConfig): Promise<string |
       audio_params: { format: 'mp3', sample_rate: 24000 },
     },
   };
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 12000);
   try {
     const res = await fetch('https://openspeech.bytedance.com/api/v3/tts/unidirectional', {
       method: 'POST',
@@ -98,7 +101,9 @@ export async function synthesize(text: string, cfg: TTSConfig): Promise<string |
         'X-Api-Request-Id': uuid(),
       },
       body: JSON.stringify(body),
+      signal: controller.signal,
     });
+    clearTimeout(timer);
     if (!res.ok) {
       console.warn('[HuoshanTTS] http', res.status);
       return null;
@@ -133,6 +138,7 @@ export async function synthesize(text: string, cfg: TTSConfig): Promise<string |
     for (let i = 0; i < bin.length; i += 1) arr[i] = bin.charCodeAt(i);
     return URL.createObjectURL(new Blob([arr], { type: 'audio/mpeg' }));
   } catch (e) {
+    clearTimeout(timer);
     console.warn('[HuoshanTTS] network', e);
     return null;
   }

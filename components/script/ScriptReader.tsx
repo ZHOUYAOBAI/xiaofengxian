@@ -113,6 +113,9 @@ export default function ScriptReader() {
 
   // 火山真人 TTS 配置（可空）
   const [ttsCfg, setTtsCfg] = useState<TTSConfig | null>(null);
+  // 火山失败计数：失败≥2 次后本会话自动跳过真人，直接系统语音（防卡顿）
+  const [ttsFails, setTtsFails] = useState(0);
+  const ttsDown = ttsFails >= 2;
   // 按角色自动切换音色（仅真人 TTS 生效）
   const [roleVoice, setRoleVoice] = useState<boolean>(true);
   const ROLE_VOICE_KEY = 'xfx-role-voice';
@@ -134,7 +137,7 @@ export default function ScriptReader() {
 
   /** 某句台词应使用的真人音色（按角色匹配，可空） */
   const voiceOfLine = (roleName?: string): string | null => {
-    if (!roleVoice || !ttsCfg) return null;
+    if (!roleVoice || !ttsCfg || ttsDown) return null;
     const rv = roleVoiceOf(roleName);
     return rv ? rv.voice_type : null;
   };
@@ -145,12 +148,16 @@ export default function ScriptReader() {
     if (!s || !text) return;
     s.cancel();
     const line = lineIdx != null ? SCRIPT.lines[lineIdx] : undefined;
-    const ok = await speakWithHuoshan(cleanText(text), ttsCfg, {
-      onStart: () => { setSpeaking(true); if (lineIdx != null) setReadingIdx(lineIdx); },
-      onEnd: () => { setSpeaking(false); setReadingIdx(null); },
-      voice: voiceOfLine(line?.roleName),
-    });
-    if (ok) return;
+    if (ttsCfg && !ttsDown) {
+      const ok = await speakWithHuoshan(cleanText(text), ttsCfg, {
+        onStart: () => { setSpeaking(true); if (lineIdx != null) setReadingIdx(lineIdx); },
+        onEnd: () => { setSpeaking(false); setReadingIdx(null); },
+        onError: () => { setTtsFails((f) => f + 1); },
+        voice: voiceOfLine(line?.roleName),
+      });
+      if (ok) return;
+      setTtsFails((f) => f + 1);
+    }
     const u = new SpeechSynthesisUtterance(cleanText(text));
     if (voice) u.voice = voice;
     u.lang = 'zh-CN';
@@ -198,12 +205,15 @@ export default function ScriptReader() {
       const el = document.querySelector(`[data-line="${item.idx}"]`);
       el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
       // 优先火山真人 TTS（按角色切换音色）
-      const done = await speakWithHuoshan(item.text, ttsCfg, {
-        onEnd: () => { setTimeout(() => { next(); }, PAUSE_MS); },
-        onError: () => { /* 单句失败不打断，下一句继续 */ },
-        voice: voiceOfLine(item.roleName),
-      });
-      if (done) return;
+      if (ttsCfg && !ttsDown) {
+        const done = await speakWithHuoshan(item.text, ttsCfg, {
+          onEnd: () => { setTimeout(() => { next(); }, PAUSE_MS); },
+          onError: () => { setTtsFails((f) => f + 1); /* 单句失败不打断，下一句继续 */ },
+          voice: voiceOfLine(item.roleName),
+        });
+        if (done) return;
+        setTtsFails((f) => f + 1);
+      }
       const u = new SpeechSynthesisUtterance(item.text);
       if (voice) u.voice = voice;
       u.lang = 'zh-CN';
@@ -319,6 +329,11 @@ export default function ScriptReader() {
           >
             按角色音色{roleVoice && ttsCfg ? '·开' : '·关'}
           </button>
+          {ttsDown && (
+            <span className="px-2.5 py-1 rounded-full text-[11.5px] text-[#B23A2E]" style={{ border: '1px solid rgba(178,58,46,0.35)' }}>
+              真人合成不可用·已自动用系统语音（检查网络/Key后刷新）
+            </span>
+          )}
           {speaking && <span className="text-[12px] text-[#8C6F2E] animate-pulse">▶ 朗读中</span>}
         </div>
 
