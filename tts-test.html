@@ -1,0 +1,58 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"><title>TTS浏览器直连测试</title>
+<style>body{font-family:sans-serif;background:#1d1915;color:#f0e8d8;padding:24px}pre{white-space:pre-wrap;background:#2a231c;padding:16px;border-radius:8px;font-size:13px}</style></head>
+<body>
+<h3>火山TTS 浏览器直连测试</h3>
+<pre id="out">运行中…</pre>
+<script>
+(function(){
+  var out = document.getElementById('out');
+  function log(s){ out.textContent += s + '\n'; }
+  log('开始 ' + new Date().toLocaleTimeString());
+  var KEY = 'cd640f02-72de-4547-b884-833edc7f8b4c';
+  var body = { req_params: { text: '松坡一生护国为本性', speaker: 'zh_male_wenrouxiaoge_uranus_bigtts', audio_params: { format: 'mp3', sample_rate: 24000 } } };
+  fetch('https://openspeech.bytedance.com/api/v3/tts/unidirectional', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Api-Key': KEY, 'X-Api-Resource-Id': 'seed-tts-2.0', 'X-Api-Request-Id': (crypto.randomUUID ? crypto.randomUUID() : String(Date.now())) },
+    body: JSON.stringify(body),
+  }).then(function(res){
+    log('HTTP ' + res.status + ' ' + res.statusText);
+    return res.text();
+  }).then(function(raw){
+    log('body长度 ' + raw.length);
+    var lines = raw.split('\n').filter(Boolean);
+    log('行数 ' + lines.length);
+    var parts = [], got = false, errInfo = '';
+    for (var i = 0; i < lines.length; i++) {
+      try {
+        var obj = JSON.parse(lines[i]);
+        var code = (obj.header && obj.header.code) != null ? obj.header.code : obj.code;
+        if (code === 0 || code === 20000000 || code === undefined) { if (obj.data) { parts.push(obj.data); got = true; } }
+        else { errInfo = '行' + i + ' code=' + code + ' ' + (obj.header ? obj.header.message : obj.message); }
+      } catch(e) { errInfo = '行' + i + ' 解析失败'; }
+    }
+    log('errInfo: ' + (errInfo || '无'));
+    log('got=' + got + ' 数据段=' + parts.length);
+    var b64 = parts.join('');
+    log('base64长度 ' + b64.length);
+    var bin;
+    try {
+      var binStr = atob(b64);
+      var bytes = new Uint8Array(binStr.length);
+      for (var j = 0; j < binStr.length; j++) bytes[j] = binStr.charCodeAt(j);
+      bin = bytes;
+    } catch(e) { log('atob失败: ' + e.message); }
+    if (bin) {
+      log('音频字节 ' + bin.length + ' MP3头 ' + bin[0].toString(16) + bin[1].toString(16));
+      var blob = new Blob([bin], { type: 'audio/mpeg' });
+      var url = URL.createObjectURL(blob);
+      var a = new Audio(url);
+      a.onloadedmetadata = function(){ log('音频可解码 时长' + Math.round(a.duration * 10) / 10 + '秒'); };
+      a.onerror = function(){ log('音频解码失败'); };
+      a.play().then(function(){ log('开始播放 ✓（沙箱无声属正常）'); }).catch(function(e){ log('play被拒(正常): ' + e.message); });
+      document.body.appendChild(a);
+    }
+  }).catch(function(e){
+    log('FETCH异常: ' + e.message + '\n' + (e.stack || ''));
+  });
+})();
+</script></body></html>

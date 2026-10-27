@@ -105,6 +105,7 @@ export async function synthesize(text: string, cfg: TTSConfig): Promise<string |
     }
     const raw = await res.text();
     // Chunked 流：每 chunk 一个 JSON 对象（可能多行/连续多个对象）
+    // code=0 为数据包；code=20000000 为流结束标记（message=OK，无音频数据），应跳过而非报错
     const chunks = raw.split('\n').filter(Boolean);
     const parts: string[] = [];
     let got = false;
@@ -112,7 +113,7 @@ export async function synthesize(text: string, cfg: TTSConfig): Promise<string |
       try {
         const obj = JSON.parse(line);
         const code = obj.header?.code ?? obj.code;
-        if (code === 0 || code === undefined) {
+        if (code === 0 || code === 20000000 || code === undefined) {
           if (obj.data) {
             parts.push(obj.data);
             got = true;
