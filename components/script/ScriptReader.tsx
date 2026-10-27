@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { SCRIPT, SONG_TITLE, SONG_RAW, ROLE_COLOR } from '@/lib/script-data';
 import VoiceDemo from './VoiceDemo';
 import VoiceTTSSettings from './VoiceTTSSettings';
-import { loadTTSConfig, speakWithHuoshan, stopHuoshan, TTSConfig } from './HuoshanTTS';
+import { loadTTSConfig, speakWithHuoshan, stopHuoshan, roleVoiceOf, TTSConfig } from './HuoshanTTS';
 
 /**
  * 演员工作台
@@ -113,18 +113,42 @@ export default function ScriptReader() {
 
   // 火山真人 TTS 配置（可空）
   const [ttsCfg, setTtsCfg] = useState<TTSConfig | null>(null);
+  // 按角色自动切换音色（仅真人 TTS 生效）
+  const [roleVoice, setRoleVoice] = useState<boolean>(true);
+  const ROLE_VOICE_KEY = 'xfx-role-voice';
   useEffect(() => {
     setTtsCfg(loadTTSConfig());
+    try {
+      const v = localStorage.getItem(ROLE_VOICE_KEY);
+      if (v != null) setRoleVoice(v === '1');
+    } catch {}
   }, []);
+
+  const toggleRoleVoice = () => {
+    setRoleVoice((v) => {
+      const next = !v;
+      try { localStorage.setItem(ROLE_VOICE_KEY, next ? '1' : '0'); } catch {}
+      return next;
+    });
+  };
+
+  /** 某句台词应使用的真人音色（按角色匹配，可空） */
+  const voiceOfLine = (roleName?: string): string | null => {
+    if (!roleVoice || !ttsCfg) return null;
+    const rv = roleVoiceOf(roleName);
+    return rv ? rv.voice_type : null;
+  };
 
   /** 逐句朗读：优先火山真人 TTS，失败回退浏览器语音 */
   const speak = async (text: string, lineIdx?: number) => {
     const s = speechRef.current;
     if (!s || !text) return;
     s.cancel();
+    const line = lineIdx != null ? SCRIPT.lines[lineIdx] : undefined;
     const ok = await speakWithHuoshan(cleanText(text), ttsCfg, {
       onStart: () => { setSpeaking(true); if (lineIdx != null) setReadingIdx(lineIdx); },
       onEnd: () => { setSpeaking(false); setReadingIdx(null); },
+      voice: voiceOfLine(line?.roleName),
     });
     if (ok) return;
     const u = new SpeechSynthesisUtterance(cleanText(text));
@@ -157,7 +181,7 @@ export default function ScriptReader() {
     const queue = act.scenes
       .flatMap((sc) => sc.lineIds.map((i) => SCRIPT.lines[i]))
       .filter((l) => l.kind !== 'stage' && cleanText(l.text))
-      .map((l) => ({ text: cleanText(l.text), idx: SCRIPT.lines.indexOf(l) }));
+      .map((l) => ({ text: cleanText(l.text), idx: SCRIPT.lines.indexOf(l), roleName: l.roleName }));
     if (!queue.length) return;
     setActSpeaking(true);
     let qi = 0;
@@ -173,10 +197,11 @@ export default function ScriptReader() {
       // 当前句滚动到视口（跟读）
       const el = document.querySelector(`[data-line="${item.idx}"]`);
       el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      // 优先火山真人 TTS
+      // 优先火山真人 TTS（按角色切换音色）
       const done = await speakWithHuoshan(item.text, ttsCfg, {
         onEnd: () => { setTimeout(() => { next(); }, PAUSE_MS); },
         onError: () => { /* 单句失败不打断，下一句继续 */ },
+        voice: voiceOfLine(item.roleName),
       });
       if (done) return;
       const u = new SpeechSynthesisUtterance(item.text);
@@ -281,6 +306,19 @@ export default function ScriptReader() {
             )}
           </div>
           <VoiceTTSSettings onChange={(c) => setTtsCfg(c)} />
+          <button
+            onClick={toggleRoleVoice}
+            disabled={!ttsCfg}
+            title="按角色自动切换音色：蔡锷句用男声、小凤仙句用女声…（需先配置真人TTS）"
+            className="px-3 py-1 rounded-full text-[12.5px] transition-all disabled:opacity-40"
+            style={{
+              border: `1px solid ${roleVoice && ttsCfg ? 'rgba(201,162,75,0.55)' : 'rgba(139,123,107,0.3)'}`,
+              color: roleVoice && ttsCfg ? '#5C4A2E' : '#8A7B6B',
+              background: roleVoice && ttsCfg ? 'rgba(201,162,75,0.14)' : 'transparent',
+            }}
+          >
+            按角色音色{roleVoice && ttsCfg ? '·开' : '·关'}
+          </button>
           {speaking && <span className="text-[12px] text-[#8C6F2E] animate-pulse">▶ 朗读中</span>}
         </div>
 
