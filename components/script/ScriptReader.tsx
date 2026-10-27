@@ -33,24 +33,32 @@ export default function ScriptReader() {
   const [revealed, setRevealed] = useState<Set<string>>(new Set());
   // TTS
   const [voice, setVoice] = useState<SpeechSynthesisVoice | null>(null);
+  const [voiceList, setVoiceList] = useState<SpeechSynthesisVoice[]>([]);
   const [rate, setRate] = useState<number>(0.9);
+  const [pitch, setPitch] = useState<number>(1);
   const [speaking, setSpeaking] = useState(false);
   const [actSpeaking, setActSpeaking] = useState(false);
+  const [readingIdx, setReadingIdx] = useState<number | null>(null);
   const speechRef = useRef<SpeechSynthesis | null>(null);
 
   useEffect(() => {
     setProgress(loadProgress());
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
       speechRef.current = window.speechSynthesis;
-      const pick = () => {
-        const voices = window.speechSynthesis.getVoices();
-        const zh = voices.find((v) => v.lang === 'zh-CN' && /mandarin|普通话|中国大陆/i.test(v.name))
-          || voices.find((v) => v.lang === 'zh-CN')
-          || voices.find((v) => v.lang.startsWith('zh'));
-        setVoice(zh || null);
+      const refresh = () => {
+        const all = window.speechSynthesis.getVoices();
+        const zh = all.filter((v) => v.lang.toLowerCase().startsWith('zh'));
+        setVoiceList(zh);
+        // 默认优选：神经/在线音色 > 普通话 > 任意中文
+        const best =
+          zh.find((v) => /neural|online|natural|premium|云|晓晓|云希|云扬|xiaoxiao|yunxi|yunyang/i.test(v.name))
+          || zh.find((v) => v.lang === 'zh-CN' && /mandarin|普通话|中国大陆/i.test(v.name))
+          || zh.find((v) => v.lang === 'zh-CN')
+          || zh[0] || null;
+        setVoice(best);
       };
-      pick();
-      window.speechSynthesis.addEventListener('voiceschanged', pick);
+      refresh();
+      window.speechSynthesis.addEventListener('voiceschanged', refresh);
     }
     return () => {
       if (speechRef.current) speechRef.current.cancel();
@@ -100,7 +108,7 @@ export default function ScriptReader() {
   /* ===== TTS ===== */
   const cleanText = (t: string) => t.replace(/（[^）]*）/g, '').replace(/\s+/g, '').trim();
 
-  const speak = (text: string) => {
+  const speak = (text: string, lineIdx?: number) => {
     const s = speechRef.current;
     if (!s || !text) return;
     s.cancel();
@@ -108,10 +116,11 @@ export default function ScriptReader() {
     if (voice) u.voice = voice;
     u.lang = 'zh-CN';
     u.rate = rate;
-    u.pitch = 1;
+    u.pitch = pitch;
     setSpeaking(true);
-    u.onend = () => setSpeaking(false);
-    u.onerror = () => setSpeaking(false);
+    if (lineIdx != null) setReadingIdx(lineIdx);
+    u.onend = () => { setSpeaking(false); setReadingIdx(null); };
+    u.onerror = () => { setSpeaking(false); setReadingIdx(null); };
     s.speak(u);
   };
 
@@ -119,7 +128,10 @@ export default function ScriptReader() {
     speechRef.current?.cancel();
     setSpeaking(false);
     setActSpeaking(false);
+    setReadingIdx(null);
   };
+
+  const PAUSE_MS = 380;
 
   const speakAct = (actId: string) => {
     const s = speechRef.current;
@@ -128,24 +140,31 @@ export default function ScriptReader() {
     const act = SCRIPT.acts.find((a) => a.id === actId)!;
     const queue = act.scenes
       .flatMap((sc) => sc.lineIds.map((i) => SCRIPT.lines[i]))
-      .filter((l) => l.kind !== 'stage' && cleanText(l.text));
+      .filter((l) => l.kind !== 'stage' && cleanText(l.text))
+      .map((l) => ({ text: cleanText(l.text), idx: SCRIPT.lines.indexOf(l) }));
     if (!queue.length) return;
     setActSpeaking(true);
     let idx = 0;
     const next = () => {
       if (!s || idx >= queue.length) {
         setActSpeaking(false);
+        setReadingIdx(null);
         return;
       }
-      const u = new SpeechSynthesisUtterance(cleanText(queue[idx].text));
+      const item = queue[idx];
+      idx += 1;
+      setReadingIdx(item.idx);
+      // 当前句滚动到视口（跟读）
+      const el = document.querySelector(`[data-line="${item.idx}"]`);
+      el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      const u = new SpeechSynthesisUtterance(item.text);
       if (voice) u.voice = voice;
       u.lang = 'zh-CN';
       u.rate = rate;
-      u.pitch = 1;
-      u.onend = () => { idx += 1; next(); };
-      u.onerror = () => { idx += 1; next(); };
+      u.pitch = pitch;
+      u.onend = () => { setTimeout(() => { next(); }, PAUSE_MS); };
+      u.onerror = () => { setTimeout(() => { next(); }, PAUSE_MS); };
       s.speak(u);
-      idx += 1;
     };
     next();
   };
@@ -199,7 +218,42 @@ export default function ScriptReader() {
                 {r}
               </button>
             ))}
-            {voice && <span className="text-[11px] text-[#8A7B6B]">· {voice.name}</span>}
+            <span className="ml-1 text-[12px] text-[#8A7B6B]">音调</span>
+            {[0.9, 1, 1.1].map((p) => (
+              <button
+                key={p}
+                onClick={() => setPitch(p)}
+                className="px-2.5 py-0.5 rounded-full text-[12px] transition-all"
+                style={{
+                  background: pitch === p ? 'var(--ink)' : 'transparent',
+                  color: pitch === p ? '#FAF6EE' : '#4A4038',
+                  border: '1px solid rgba(139,123,107,0.35)',
+                }}
+              >
+                {p}
+              </button>
+            ))}
+            {voiceList.length > 0 && (
+              <>
+                <span className="ml-1 text-[12px] text-[#8A7B6B]">音色</span>
+                <select
+                  value={voice?.name || ''}
+                  onChange={(e) => {
+                    const v = voiceList.find((x) => x.name === e.target.value);
+                    if (v) { setVoice(v); speechRef.current?.cancel(); setSpeaking(false); setReadingIdx(null); }
+                  }}
+                  className="max-w-[220px] px-2.5 py-1.5 rounded-full text-[12px] outline-none"
+                  style={{ background: 'var(--paper-2)', border: '1px solid rgba(139,123,107,0.35)', color: '#4A4038' }}
+                  title="选择朗读音色（推荐带“神经/在线”字样的）"
+                >
+                  {voiceList.map((v) => (
+                    <option key={v.name} value={v.name}>
+                      {v.name}{/neural|online|natural|premium|云/i.test(v.name) ? ' ☆' : ''}
+                    </option>
+                  ))}
+                </select>
+              </>
+            )}
           </div>
           {speaking && <span className="text-[12px] text-[#8C6F2E] animate-pulse">▶ 朗读中</span>}
         </div>
@@ -354,6 +408,7 @@ export default function ScriptReader() {
                                 onReveal={reveal}
                                 onSpeak={speak}
                                 speaking={speaking}
+                                readingIdx={readingIdx}
                               />
                             </FragmentRow>
                           );
@@ -407,7 +462,7 @@ function ModeBtn({ active, onClick, children }: { active: boolean; onClick: () =
 
 /** 单条台词行 */
 function LineRow({
-  line, idx, selected, mode, progress, revealed, onReveal, onSpeak, speaking,
+  line, idx, selected, mode, progress, revealed, onReveal, onSpeak, speaking, readingIdx,
 }: {
   line: { kind: string; text: string; roleName?: string; songIndex: number | null };
   idx: number;
@@ -416,8 +471,9 @@ function LineRow({
   progress: ProgressMap;
   revealed: boolean;
   onReveal: (role: string, idx: number) => void;
-  onSpeak: (text: string) => void;
+  onSpeak: (text: string, idx: number) => void;
   speaking: boolean;
+  readingIdx?: number | null;
 }) {
   const isStage = line.kind === 'stage';
   const isSong = line.songIndex != null;
@@ -425,6 +481,7 @@ function LineRow({
   const on = selected.has(role);
   const song = isSong ? SONG_TITLE[line.songIndex!] : null;
   const color = ROLE_COLOR[role];
+  const isReading = readingIdx === idx;
 
   // 背诵模式：选中角色的台词遮罩（未翻开）
   const practicing = mode === 'practice' && on && !revealed && !isStage;
@@ -433,6 +490,7 @@ function LineRow({
     const done = !!progress[role]?.[idx];
     return (
       <button
+        data-line={idx}
         onClick={() => onReveal(role, idx)}
         className="w-full text-left py-3 border-b flex items-center gap-3 group"
         style={{ borderColor: 'rgba(139,123,107,0.12)', background: 'rgba(139,123,107,0.06)' }}
@@ -457,13 +515,24 @@ function LineRow({
 
   return (
     <div
+      data-line={idx}
       className="py-3 border-b transition-all duration-300 group"
       style={{
         ...base,
         borderColor: 'rgba(139,123,107,0.12)',
-        background: on ? `${color}14` : isSong ? 'rgba(201,162,75,0.04)' : 'transparent',
-        borderLeft: on ? `3px solid ${color}` : '3px solid transparent',
-        paddingLeft: on ? 14 : 17,
+        background: isReading
+          ? 'rgba(201,162,75,0.22)'
+          : on
+            ? `${color}14`
+            : isSong
+              ? 'rgba(201,162,75,0.04)'
+              : 'transparent',
+        borderLeft: isReading
+          ? '3px solid #C9A24B'
+          : on
+            ? `3px solid ${color}`
+            : '3px solid transparent',
+        paddingLeft: isReading || on ? 14 : 17,
         transform: on ? 'translateX(2px)' : 'none',
       }}
     >
@@ -501,7 +570,7 @@ function LineRow({
           {/* 逐句朗读 */}
           {!isStage && (
             <button
-              onClick={(e) => { e.stopPropagation(); onSpeak(line.text); }}
+              onClick={(e) => { e.stopPropagation(); onSpeak(line.text, idx); }}
               title="朗读这句"
               aria-label="朗读这句"
               className="shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-[13px] transition-all opacity-40 hover:opacity-100"
@@ -525,7 +594,7 @@ function SearchResult({
   mode: 'read' | 'practice';
   progress: ProgressMap;
   onReveal: (role: string, idx: number) => void;
-  onSpeak: (text: string) => void;
+  onSpeak: (text: string, idx: number) => void;
 }) {
   const grouped = new Map<string, typeof rows>();
   for (const r of rows) {
