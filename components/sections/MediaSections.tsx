@@ -324,7 +324,7 @@ export function MyTheatreSection() {
             <span className="link-line inline-block mt-5 text-[13px]">筹备中 →</span>
           </a>
           <a
-            href="#showings"
+            href="#guide"
             className="p-7 rounded-2xl no-underline transition-transform hover:-translate-y-1"
             style={{ background: 'var(--paper-2)', border: '1px solid rgba(139,123,107,0.22)', color: 'var(--ink)' }}
           >

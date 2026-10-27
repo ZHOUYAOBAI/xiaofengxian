@@ -2,26 +2,26 @@ const COLS = [
   {
     h: '剧目',
     links: [
-      { href: '#story', t: '这出戏' },
-      { href: '#cast', t: '角色' },
-      { href: '#gallery', t: '曲谱' },
-      { href: '#listen', t: '原声' },
+      { href: '/#story', t: '这出戏' },
+      { href: '/#cast', t: '角色' },
+      { href: '/#gallery', t: '曲谱' },
+      { href: '/#listen', t: '原声' },
     ],
   },
   {
     h: '来看戏',
     links: [
-      { href: '#showings', t: '演出场次' },
-      { href: '#guide', t: '观剧指南' },
-      { href: '#message', t: '留言' },
+      { href: '/#guide', t: '演出场次' },
+      { href: '/#guide', t: '观剧指南' },
+      { href: '/#message', t: '留言' },
     ],
   },
   {
     h: '加入我们',
     links: [
-      { href: '#join', t: '招角' },
-      { href: 'script', t: '演员剧本' },
-      { href: '#studio', t: '我的剧场' },
+      { href: '/#join', t: '招角' },
+      { href: '/script', t: '演员剧本' },
+      { href: '/#studio', t: '我的剧场' },
     ],
   },
 ];

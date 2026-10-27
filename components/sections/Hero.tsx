@@ -46,7 +46,7 @@ export default function Hero() {
             {HERO.lede}
           </p>
           <div data-reveal data-reveal-delay="0.3" className="mt-10 flex flex-wrap gap-4">
-            <a href="#showings" className="btn btn-gold">查看本月场次</a>
+            <a href="#guide" className="btn btn-gold">查看本月场次</a>
             <a href="#story" className="btn" style={{ borderColor: 'rgba(250,246,238,0.3)', color: 'var(--paper)' }}>
               认识这出戏
             </a>
@@ -92,7 +92,7 @@ export default function Hero() {
                 </div>
               ))}
             </div>
-            <a href="#showings" className="link-line inline-block mt-6 text-[13.5px]">全部场次与预约 →</a>
+            <a href="#guide" className="link-line inline-block mt-6 text-[13.5px]">全部场次与预约 →</a>
           </div>
         </aside>
       </div>

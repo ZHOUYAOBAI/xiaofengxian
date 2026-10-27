@@ -15,6 +15,7 @@ import { SINGING, SONG_META, isAside, isSinging, songOf } from '@/lib/song-seman
  */
 const PROGRESS_KEY = 'xfx-script-progress';
 const MASTERY_KEY = 'xfx-script-mastery';
+const STARS_KEY = 'xfx-script-stars';
 
 type ProgressMap = Record<string, Record<number, true>>;
 type MasteryMap = Record<string, Record<number, 'hot' | 'cold'>>;
@@ -90,10 +91,17 @@ export default function ScriptReader() {
   const [progress, setProgress] = useState<ProgressMap>({});
   const [mastery, setMastery] = useState<MasteryMap>({});
   const [revealed, setRevealed] = useState<Set<string>>(new Set());
+  const [stars, setStars] = useState<Set<number>>(new Set());
+  const [jump, setJump] = useState<{ line?: number; song?: number } | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
 
   useEffect(() => {
     setProgress(loadProgress());
     setMastery(loadMastery());
+    try {
+      const s = JSON.parse(localStorage.getItem(STARS_KEY) || '[]');
+      setStars(new Set(Array.isArray(s) ? s : []));
+    } catch {}
   }, []);
 
   const meta = SCRIPT.meta;
@@ -159,6 +167,103 @@ export default function ScriptReader() {
       return next;
     });
   };
+
+  /* ---- 星标收藏 ---- */
+  const toggleStar = (idx: number) => {
+    setStars((prev) => {
+      const next = new Set(prev);
+      if (next.has(idx)) next.delete(idx);
+      else next.add(idx);
+      try {
+        localStorage.setItem(STARS_KEY, JSON.stringify([...next]));
+      } catch {}
+      return next;
+    });
+  };
+  const clearStars = () => {
+    setStars(new Set());
+    try {
+      localStorage.setItem(STARS_KEY, '[]');
+    } catch {}
+  };
+
+  /* ---- 定位跳转（切幕 → 滚动 → 高亮） ---- */
+  const jumpToLine = (idx: number) => {
+    setActiveAct(SCRIPT.lines[idx].actId);
+    setQuery('');
+    setJump({ line: idx });
+  };
+  const jumpToSong = (song: number) => {
+    const first = Object.keys(SINGING).find((k) => SINGING[k].song === song);
+    if (first != null) setActiveAct(SCRIPT.lines[+first].actId);
+    setJump({ song });
+  };
+  useEffect(() => {
+    if (!jump) return;
+    const target = jump.line != null ? `[data-line="${jump.line}"]` : `#song-${jump.song}`;
+    const cls = jump.line != null ? 'line-jump' : 'song-jump';
+    const t = setInterval(() => {
+      const el = document.querySelector(target);
+      if (el) {
+        clearInterval(t);
+        (el as HTMLElement).scrollIntoView({ behavior: 'smooth', block: 'center' });
+        el.classList.add(cls);
+        setTimeout(() => el.classList.remove(cls), 2600);
+        setJump(null);
+      }
+    }, 220);
+    const guard = setTimeout(() => clearInterval(t), 4500);
+    return () => {
+      clearInterval(t);
+      clearTimeout(guard);
+    };
+  }, [jump]);
+
+  /* ---- 台词小抄（复制） ---- */
+  const flash = (msg: string) => {
+    setToast(msg);
+    setTimeout(() => setToast(null), 2400);
+  };
+  const copyAct = async () => {
+    const act = SCRIPT.acts.find((a) => a.id === activeAct)!;
+    const txt = act.scenes
+      .flatMap((sc) => sc.lineIds)
+      .map((i) => {
+        const l = SCRIPT.lines[i];
+        return l.kind === 'stage' ? `【${l.text}】` : `${l.roleName || '台词'}：${l.text}`;
+      })
+      .join('\n');
+    try {
+      await navigator.clipboard.writeText(txt);
+      flash(`已复制「${act.num}」全部台词 ${txt.split('\n').length} 行`);
+    } catch {
+      flash('复制失败，请手动框选复制');
+    }
+  };
+  const copyRoles = async () => {
+    const roles = Array.from(selected);
+    const txt = SCRIPT.lines
+      .map((l, i) => ({ l, i }))
+      .filter(({ l }) => roles.includes(l.roleName || '') && l.kind !== 'stage' && l.text.trim())
+      .map(({ l }) => `${l.roleName}：${l.text}`)
+      .join('\n');
+    try {
+      await navigator.clipboard.writeText(txt);
+      flash(`已复制 ${roles.join('、')} 台词 ${txt.split('\n').length} 句`);
+    } catch {
+      flash('复制失败，请手动框选复制');
+    }
+  };
+
+  /* 唱段 → 所属幕 */
+  const songActs = useMemo(() => {
+    const m: Record<number, string> = {};
+    for (const k of Object.keys(SINGING)) {
+      const s = SINGING[k].song;
+      if (m[s] == null) m[s] = SCRIPT.lines[+k].actId;
+    }
+    return m;
+  }, []);
 
   const goAct = (id: string) => {
     setActiveAct(id);
@@ -254,6 +359,33 @@ export default function ScriptReader() {
           </section>
 
           <section>
+            <SideTitle>唱段目录（{Object.keys(SONG_META).length} 曲）</SideTitle>
+            <div className="flex flex-col gap-1 max-h-[250px] overflow-y-auto pr-1">
+              {Object.keys(SONG_META)
+                .sort((a, b) => +a - +b)
+                .map((k) => {
+                  const m = SONG_META[k];
+                  const actNum = SCRIPT.acts.find((a) => a.id === songActs[+k])?.num;
+                  return (
+                    <button
+                      key={k}
+                      onClick={() => jumpToSong(+k)}
+                      className="flex items-center gap-2 px-2.5 py-1.5 rounded-md text-left transition-all"
+                      style={{ background: 'rgba(201,162,75,0.07)', border: '1px solid rgba(201,162,75,0.14)' }}
+                    >
+                      <span className="text-[12px]" style={{ color: '#8C6F2E' }}>♫</span>
+                      <span className="text-[12.5px] font-cn truncate" style={{ color: 'var(--gold-soft)' }}>{m.title}</span>
+                      <span className="text-[10.5px] ml-auto shrink-0" style={{ color: 'var(--muted)' }}>
+                        {actNum || ''}{m.n}句
+                      </span>
+                    </button>
+                  );
+                })}
+            </div>
+            <SideHint>点击任意曲目，自动跳到对应唱段并高亮。</SideHint>
+          </section>
+
+          <section>
             <div className="mb-2.5 flex items-center justify-between">
               <SideTitle>角色</SideTitle>
               {selected.size > 0 && (
@@ -305,6 +437,34 @@ export default function ScriptReader() {
             )}
           </section>
 
+          {stars.size > 0 && (
+            <section>
+              <div className="mb-2.5 flex items-center justify-between">
+                <SideTitle>星标句（{stars.size}）</SideTitle>
+                <button onClick={clearStars} className="text-[12px] px-2.5 py-1 rounded-full"
+                  style={{ border: '1px solid rgba(232,165,155,0.5)', color: '#E8A59B' }}>
+                  清空
+                </button>
+              </div>
+              <div className="flex flex-col gap-1 max-h-[220px] overflow-y-auto pr-1">
+                {Array.from(stars).sort((a, b) => a - b).map((idx) => {
+                  const l = SCRIPT.lines[idx];
+                  return (
+                    <button key={idx} onClick={() => jumpToLine(idx)}
+                      className="px-2.5 py-1.5 rounded-md text-left text-[12px] leading-relaxed"
+                      style={{ background: 'rgba(201,162,75,0.07)', border: '1px solid rgba(201,162,75,0.14)' }}>
+                      <span className="mr-1" style={{ color: '#E8C66B' }}>★</span>
+                      <span style={{ color: 'var(--muted)' }}>{l.roleName || '台词'}：</span>
+                      <span style={{ color: 'var(--paper)' }}>
+                        {l.text.length > 24 ? l.text.slice(0, 24) + '…' : l.text}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
+          )}
+
           {mode === 'practice' && practiceRole && (
             <section>
               <SideTitle>背诵进度</SideTitle>
@@ -348,6 +508,23 @@ export default function ScriptReader() {
           )}
 
           <section>
+            <SideTitle>台词小抄</SideTitle>
+            <div className="flex flex-col gap-2">
+              <button onClick={copyAct} className="px-3 py-2 rounded-lg text-[13px] text-left transition-all"
+                style={{ border: '1px solid rgba(201,162,75,0.35)', color: 'var(--gold-soft)' }}>
+                复制当前幕台词
+              </button>
+              {selected.size > 0 && (
+                <button onClick={copyRoles} className="px-3 py-2 rounded-lg text-[13px] text-left transition-all"
+                  style={{ border: '1px solid rgba(201,162,75,0.35)', color: 'var(--gold-soft)' }}>
+                  复制所选角色台词（{Array.from(selected).join('、')}）
+                </button>
+              )}
+            </div>
+            <SideHint>一键导出纯文本，粘贴到备忘录或打印背诵小抄。</SideHint>
+          </section>
+
+          <section>
             <SideTitle>搜索</SideTitle>
             <input
               value={query}
@@ -381,7 +558,7 @@ export default function ScriptReader() {
           ) : searching ? (
             <SearchResult rows={filtered} selected={selected} mode={mode === 'practice' ? 'practice' : 'read'} progress={progress} onReveal={reveal} />
           ) : (
-            <ScriptPage actId={activeAct} selected={selected} mode={mode === 'practice' ? 'practice' : 'read'} progress={progress} revealed={revealed} onReveal={reveal} />
+            <ScriptPage actId={activeAct} selected={selected} mode={mode === 'practice' ? 'practice' : 'read'} progress={progress} revealed={revealed} onReveal={reveal} stars={stars} onStar={toggleStar} />
           )}
         </main>
       </div>
@@ -389,6 +566,13 @@ export default function ScriptReader() {
       <div className="shell pb-16 text-center text-[12.5px] tracking-[0.15em]" style={{ color: 'var(--tea)' }}>
         {meta.title} · {meta.version}
       </div>
+
+      {toast && (
+        <div className="fixed bottom-6 right-6 z-[60] px-5 py-3 rounded-xl text-[13px] tracking-[0.06em]"
+          style={{ background: 'var(--ink)', color: 'var(--gold-soft)', border: '1px solid rgba(201,162,75,0.5)', boxShadow: '0 6px 24px rgba(0,0,0,0.25)' }}>
+          {toast}
+        </div>
+      )}
     </div>
   );
 }
@@ -446,7 +630,7 @@ function EmptyStage({ title, hint }: { title: string; hint: string }) {
 /* ================= 剧本页（语义块排版） ================= */
 
 function ScriptPage({
-  actId, selected, mode, progress, revealed, onReveal,
+  actId, selected, mode, progress, revealed, onReveal, stars, onStar,
 }: {
   actId: string;
   selected: Set<string>;
@@ -454,6 +638,8 @@ function ScriptPage({
   progress: ProgressMap;
   revealed: Set<string>;
   onReveal: (role: string, idx: number) => void;
+  stars: Set<number>;
+  onStar: (idx: number) => void;
 }) {
   const act = SCRIPT.acts.find((a) => a.id === actId)!;
   return (
@@ -477,7 +663,7 @@ function ScriptPage({
           </div>
           <div className="flex flex-col">
             {buildBlocks(sc).map((b, bi) => (
-              <BlockView key={bi} b={b} selected={selected} mode={mode} progress={progress} revealed={revealed} onReveal={onReveal} />
+              <BlockView key={bi} b={b} selected={selected} mode={mode} progress={progress} revealed={revealed} onReveal={onReveal} stars={stars} onStar={onStar} />
             ))}
           </div>
         </div>
@@ -487,7 +673,7 @@ function ScriptPage({
 }
 
 function BlockView({
-  b, selected, mode, progress, revealed, onReveal,
+  b, selected, mode, progress, revealed, onReveal, stars, onStar,
 }: {
   b: Block;
   selected: Set<string>;
@@ -495,6 +681,8 @@ function BlockView({
   progress: ProgressMap;
   revealed: Set<string>;
   onReveal: (role: string, idx: number) => void;
+  stars: Set<number>;
+  onStar: (idx: number) => void;
 }) {
   if (b.type === 'stage') return <StageNote text={SCRIPT.lines[b.idx!].text} />;
   if (b.type === 'aside') return <AsideNote text={SCRIPT.lines[b.idx!].text} />;
@@ -515,6 +703,8 @@ function BlockView({
       progress={progress}
       revealed={revealed.has(`${b.role || ''}:${b.idx}`)}
       onReveal={onReveal}
+      starred={stars.has(b.idx!)}
+      onStar={onStar}
     />
   );
 }
@@ -541,7 +731,7 @@ function AsideNote({ text }: { text: string }) {
 /** 唱段横幅 */
 function SongBanner({ song, title, note, singers }: { song: number; title: string; note: string; singers: string[] }) {
   return (
-    <div className="my-6 px-5 py-4 rounded-xl"
+    <div id={`song-${song}`} className="my-6 px-5 py-4 rounded-xl"
       style={{ background: 'linear-gradient(90deg, rgba(201,162,75,0.22), rgba(201,162,75,0.08))', border: '1px solid rgba(201,162,75,0.45)', borderLeft: '4px solid var(--gold)' }}>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
         <span className="text-[20px]" style={{ color: '#8C6F2E' }}>♫</span>
@@ -557,7 +747,7 @@ function SongBanner({ song, title, note, singers }: { song: number; title: strin
 
 /** 台词行：唱词（sing）与对白（talk）共用，块首带角色章、续行缩进 */
 function ScriptLine({
-  line, idx, role, kind, first, selected, mode, progress, revealed, onReveal,
+  line, idx, role, kind, first, selected, mode, progress, revealed, onReveal, starred, onStar,
 }: {
   line: { text: string; songIndex: number | null };
   idx: number;
@@ -569,6 +759,8 @@ function ScriptLine({
   progress: ProgressMap;
   revealed: boolean;
   onReveal: (role: string, idx: number) => void;
+  starred: boolean;
+  onStar: (idx: number) => void;
 }) {
   const isSing = kind === 'sing';
   const on = selected.has(role);
@@ -610,7 +802,7 @@ function ScriptLine({
   return (
     <div
       data-line={idx}
-      className="py-[9px] border-b transition-all duration-300 flex items-start gap-3"
+      className="script-line py-[9px] border-b transition-all duration-300 flex items-start gap-3"
       style={{
         ...base,
         borderLeft: on ? `3px solid ${color}` : isSing ? '3px solid rgba(201,162,75,0.35)' : '3px solid transparent',
@@ -644,6 +836,18 @@ function ScriptLine({
         {line.text}
         {isSing && songTitle && <span className="ml-2.5 text-[11.5px] tracking-[0.06em]" style={{ color: '#8C6F2E' }}>♪《{songTitle}》</span>}
       </p>
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          onStar(idx);
+        }}
+        className={`script-star-btn ${starred ? 'on' : ''} shrink-0 px-1 text-[16px] leading-none self-start mt-0.5`}
+        style={{ color: starred ? '#C9A24B' : 'rgba(201,162,75,0.75)' }}
+        title={starred ? '取消星标' : '标记重点句'}
+        aria-label={starred ? '取消星标' : '标记重点句'}
+      >
+        {starred ? '★' : '☆'}
+      </button>
     </div>
   );
 }

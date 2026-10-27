@@ -192,3 +192,32 @@ body {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ---------- 工作台 · 定位跳转高亮 ---------- */
+@keyframes jumpPulse {
+  0%, 100% {
+    outline: 3px solid rgba(201, 162, 75, 0.75);
+    outline-offset: 2px;
+    box-shadow: 0 0 0 4px rgba(201, 162, 75, 0.28);
+  }
+  50% {
+    outline: 3px solid rgba(201, 162, 75, 0.35);
+    outline-offset: 2px;
+    box-shadow: 0 0 0 8px rgba(201, 162, 75, 0.12);
+  }
+}
+.line-jump {
+  animation: jumpPulse 0.55s ease-in-out 3;
+}
+.song-jump {
+  animation: jumpPulse 0.55s ease-in-out 3;
+  border-radius: 10px;
+}
+.script-star-btn {
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+.script-line:hover .script-star-btn,
+.script-star-btn.on {
+  opacity: 1;
+}

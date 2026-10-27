@@ -118,7 +118,7 @@ export function ShowingsSection({ variant = 'full' }: { variant?: 'recent' | 'fu
 
         {variant === 'recent' && (
           <div className="mt-10 text-center" data-reveal>
-            <a href="#showings" className="link-line text-[14px]">查看全部场次与预约 →</a>
+            <a href="#guide" className="link-line text-[14px]">查看全部场次与预约 →</a>
           </div>
         )}
       </div>

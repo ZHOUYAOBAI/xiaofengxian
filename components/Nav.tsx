@@ -3,11 +3,11 @@
 import { useEffect, useState } from 'react';
 
 const LINKS = [
-  { href: '#story', label: '这出戏' },
-  { href: '#cast', label: '角色' },
-  { href: '#showings', label: '来看戏' },
-  { href: '#listen', label: '原声' },
-  { href: '#join', label: '加入我们' },
+  { href: '/#story', label: '这出戏' },
+  { href: '/#cast', label: '角色' },
+  { href: '/#guide', label: '来看戏' },
+  { href: '/#listen', label: '原声' },
+  { href: '/#join', label: '加入我们' },
 ];
 
 export default function Nav() {
@@ -32,7 +32,7 @@ export default function Nav() {
       }}
     >
       <div className="shell flex items-center justify-between h-20">
-        <a href="#" className="font-cn text-[19px] tracking-[0.14em] text-paper no-underline">
+        <a href="/" className="font-cn text-[19px] tracking-[0.14em] text-paper no-underline">
           蔡锷与小凤仙
           <span className="block text-[11px] tracking-[0.3em] text-gold/80 mt-0.5">庭院音乐剧</span>
         </a>
@@ -48,7 +48,7 @@ export default function Nav() {
             </a>
           ))}
           <a
-            href="#studio"
+            href="/#studio"
             className="px-5 py-2 rounded-full text-[13px] tracking-[0.14em] no-underline transition-all"
             style={{
               border: '1px solid rgba(201,162,75,0.35)',
@@ -83,7 +83,7 @@ export default function Nav() {
               {l.label}
             </a>
           ))}
-          <a href="#studio" onClick={() => setOpen(false)} className="text-[15px] tracking-[0.14em] text-gold-soft no-underline">
+          <a href="/#studio" onClick={() => setOpen(false)} className="text-[15px] tracking-[0.14em] text-gold-soft no-underline">
             我的剧场
           </a>
         </nav>
