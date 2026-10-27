@@ -43,6 +43,48 @@ export default function ScriptReader() {
   const [actSpeaking, setActSpeaking] = useState(false);
   const [readingIdx, setReadingIdx] = useState<number | null>(null);
   const speechRef = useRef<SpeechSynthesis | null>(null);
+  // 本地真人逐句音频（整剧预合成，无网络依赖）
+  const [localLines, setLocalLines] = useState<Set<number> | null>(null);
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch('./audio/line-index.json');
+        if (res.ok) {
+          const j = await res.json();
+          if (j && Array.isArray(j.done)) setLocalLines(new Set(j.done));
+        }
+      } catch { /* 忽略，走实时合成/系统语音 */ }
+    })();
+  }, []);
+
+  /** 播放本地真人音频（逐句 mp3）；返回是否已接管播放 */
+  const playLocalLine = (idx: number, onEnd: () => void): boolean => {
+    if (!localLines || !localLines.has(idx)) return false;
+    try {
+      const a = new Audio(`./audio/line/${idx}.mp3`);
+      localAudioRef.current = a;
+      const done = () => { if (localAudioRef.current === a) localAudioRef.current = null; onEnd(); };
+      a.onended = done;
+      a.onerror = () => { a.onended = null; done(); };
+      a.play().catch(() => { a.onended = null; done(); });
+      setSpeaking(true);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  const stopLocal = () => {
+    // 本地音频播放由 stopSpeak 统一处理：记录当前 audio 元素
+    if (localAudioRef.current) {
+      const a = localAudioRef.current;
+      a.onended = null;
+      a.onerror = null;
+      a.pause();
+      localAudioRef.current = null;
+    }
+  };
+  const localAudioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
     setProgress(loadProgress());
@@ -142,12 +184,19 @@ export default function ScriptReader() {
     return rv ? rv.voice_type : null;
   };
 
-  /** 逐句朗读：优先火山真人 TTS，失败回退浏览器语音 */
+  /** 逐句朗读：本地真人音频优先，其次火山真人 TTS，失败回退浏览器语音 */
   const speak = async (text: string, lineIdx?: number) => {
     const s = speechRef.current;
     if (!s || !text) return;
+    stopLocal();
     s.cancel();
     const line = lineIdx != null ? SCRIPT.lines[lineIdx] : undefined;
+    // ① 本地真人音频（最稳，无网络依赖）
+    if (lineIdx != null && playLocalLine(lineIdx, () => { setSpeaking(false); setReadingIdx(null); })) {
+      setReadingIdx(lineIdx);
+      return;
+    }
+    // ② 火山实时真人 TTS
     if (ttsCfg && !ttsDown) {
       const ok = await speakWithHuoshan(cleanText(text), ttsCfg, {
         onStart: () => { setSpeaking(true); if (lineIdx != null) setReadingIdx(lineIdx); },
@@ -158,6 +207,7 @@ export default function ScriptReader() {
       if (ok) return;
       setTtsFails((f) => f + 1);
     }
+    // ③ 浏览器系统语音（兜底）
     const u = new SpeechSynthesisUtterance(cleanText(text));
     if (voice) u.voice = voice;
     u.lang = 'zh-CN';
@@ -171,6 +221,7 @@ export default function ScriptReader() {
   };
 
   const stopSpeak = () => {
+    stopLocal();
     speechRef.current?.cancel();
     stopHuoshan();
     setSpeaking(false);
@@ -204,7 +255,11 @@ export default function ScriptReader() {
       // 当前句滚动到视口（跟读）
       const el = document.querySelector(`[data-line="${item.idx}"]`);
       el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      // 优先火山真人 TTS（按角色切换音色）
+      // ① 本地真人音频优先
+      if (playLocalLine(item.idx, () => { setTimeout(() => { next(); }, PAUSE_MS); })) {
+        return;
+      }
+      // ② 火山真人 TTS（按角色切换音色）
       if (ttsCfg && !ttsDown) {
         const done = await speakWithHuoshan(item.text, ttsCfg, {
           onEnd: () => { setTimeout(() => { next(); }, PAUSE_MS); },
@@ -214,6 +269,7 @@ export default function ScriptReader() {
         if (done) return;
         setTtsFails((f) => f + 1);
       }
+      // ③ 浏览器系统语音（兜底）
       const u = new SpeechSynthesisUtterance(item.text);
       if (voice) u.voice = voice;
       u.lang = 'zh-CN';
