@@ -1,28 +1,28 @@
 'use client';
 
 /**
- * 火山引擎 · 豆包语音 真人 TTS 前端模块
- * - 设置面板：AppID / Access Token / 音色（localStorage 保存）
- * - synthesize()：调用 https://openspeech.bytedance.com/api/v1/tts（V1 非流式，JSON+base64）
- * - 鉴权：Authorization: Bearer;<token>
+ * 火山引擎 · 豆包语音合成大模型 2.0 —— 浏览器端接入
+ * - 新版控制台鉴权：X-Api-Key（控制台 > API Key 管理）
+ * - 接口：POST https://openspeech.bytedance.com/api/v3/tts/unidirectional（HTTP Chunked）
+ * - 资源：X-Api-Resource-Id: seed-tts-2.0（需在控制台开通/试用语音合成服务）
  * - 失败返回 null，调用方回退浏览器语音
  */
 
 export type TTSConfig = {
-  appid: string;
-  token: string;
+  apiKey: string;
   voice: string; // voice_type 代号
   voiceName: string;
 };
 
-const KEY = 'xfx-huoshan-tts';
+const KEY = 'xfx-huoshan-tts-v2';
 
 export const VOICE_OPTIONS: { name: string; voice_type: string; tip: string }[] = [
-  { name: '温柔小哥（男·沉稳）', voice_type: 'zh_male_wenrouxiaoge_mars_bigtts', tip: '通用大模型男声' },
-  { name: '甜美桃子（女·清亮）', voice_type: 'zh_female_tianmeitaozi_mars_bigtts', tip: '通用大模型女声' },
-  { name: '霸气青叔（男·厚重）', voice_type: 'zh_male_baqixinyin_emo_v2_mars_bigtts', tip: '角色感男声' },
-  { name: '古风少御（女·戏腔感）', voice_type: 'zh_female_gufengshaoyu_mars_bigtts', tip: '民国戏腔向女声' },
-  { name: '儒雅总裁（男·文气）', voice_type: 'ICL_zh_male_ruyazongcai_tob', tip: '台词感男声' },
+  { name: '温柔小哥 2.0（男·沉稳）', voice_type: 'zh_male_wenrouxiaoge_uranus_bigtts', tip: '民国将军气质首选' },
+  { name: '云舟 2.0（男·浑厚）', voice_type: 'zh_male_m191_uranus_bigtts', tip: '播音级男声' },
+  { name: '东方浩然 2.0（男·正气）', voice_type: 'zh_male_dongfanghaoran_uranus_bigtts', tip: '家国戏台词感' },
+  { name: 'Vivi 2.0（女·戏腔向）', voice_type: 'zh_female_vv_uranus_bigtts', tip: '民国歌女首选' },
+  { name: '知性灿灿 2.0（女·清亮）', voice_type: 'zh_female_cancan_uranus_bigtts', tip: '角色感女声' },
+  { name: '邻家女孩 2.0（女·柔）', voice_type: 'zh_female_linjianvhai_uranus_bigtts', tip: '丫鬟/少女向' },
 ];
 
 export function loadTTSConfig(): TTSConfig | null {
@@ -31,7 +31,7 @@ export function loadTTSConfig(): TTSConfig | null {
     const raw = localStorage.getItem(KEY);
     if (!raw) return null;
     const c = JSON.parse(raw);
-    return c && c.appid && c.token ? c : null;
+    return c && c.apiKey ? c : null;
   } catch {
     return null;
   }
@@ -50,20 +50,27 @@ function uuid(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
+/**
+ * 调用豆包语音合成大模型2.0（HTTP Chunked 流式）。
+ * 返回 mp3 的 objectURL；失败返回 null。
+ */
 export async function synthesize(text: string, cfg: TTSConfig): Promise<string | null> {
   if (!text || !cfg) return null;
   const body = {
-    app: { appid: cfg.appid, token: cfg.token, cluster: 'volcano_tts' },
-    user: { uid: 'xfx-workbench' },
-    audio: { voice_type: cfg.voice, encoding: 'mp3', speed_ratio: 1.0 },
-    request: { reqid: uuid(), text, operation: 'query' },
+    req_params: {
+      text,
+      speaker: cfg.voice,
+      audio_params: { format: 'mp3', sample_rate: 24000 },
+    },
   };
   try {
-    const res = await fetch('https://openspeech.bytedance.com/api/v1/tts', {
+    const res = await fetch('https://openspeech.bytedance.com/api/v3/tts/unidirectional', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer;${cfg.token}`,
+        'X-Api-Key': cfg.apiKey,
+        'X-Api-Resource-Id': 'seed-tts-2.0',
+        'X-Api-Request-Id': uuid(),
       },
       body: JSON.stringify(body),
     });
@@ -71,16 +78,34 @@ export async function synthesize(text: string, cfg: TTSConfig): Promise<string |
       console.warn('[HuoshanTTS] http', res.status);
       return null;
     }
-    const j = await res.json();
-    if (j.code !== 3000 || !j.data) {
-      console.warn('[HuoshanTTS] code', j.code, j.message);
-      return null;
+    const raw = await res.text();
+    // Chunked 流：每 chunk 一个 JSON 对象（可能多行/连续多个对象）
+    const chunks = raw.split('\n').filter(Boolean);
+    const parts: string[] = [];
+    let got = false;
+    for (const line of chunks) {
+      try {
+        const obj = JSON.parse(line);
+        const code = obj.header?.code ?? obj.code;
+        if (code === 0 || code === undefined) {
+          if (obj.data) {
+            parts.push(obj.data);
+            got = true;
+          }
+        } else {
+          console.warn('[HuoshanTTS] resp code', code, obj.header?.message || obj.message);
+          return null;
+        }
+      } catch {
+        /* 忽略无法解析的行 */
+      }
     }
-    const bytes = atob(j.data);
-    const arr = new Uint8Array(bytes.length);
-    for (let i = 0; i < bytes.length; i += 1) arr[i] = bytes.charCodeAt(i);
-    const blob = new Blob([arr], { type: 'audio/mpeg' });
-    return URL.createObjectURL(blob);
+    if (!got || !parts.length) return null;
+    const b64 = parts.join('');
+    const bin = atob(b64);
+    const arr = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i += 1) arr[i] = bin.charCodeAt(i);
+    return URL.createObjectURL(new Blob([arr], { type: 'audio/mpeg' }));
   } catch (e) {
     console.warn('[HuoshanTTS] network', e);
     return null;
