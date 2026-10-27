@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { SCRIPT, SONG_TITLE, SONG_RAW, ROLE_COLOR } from '@/lib/script-data';
+import VoiceDemo from './VoiceDemo';
 
 /**
  * 演员工作台
@@ -181,6 +182,9 @@ export default function ScriptReader() {
             {meta.acts} 幕 {meta.scenes} 场 · {meta.songs} 曲 · {meta.lines} 条台词
           </span>
         </div>
+
+        {/* 真人示范：AI 播音整段朗读 */}
+        <VoiceDemo />
 
         {/* 模式切换 + 朗读控制 */}
         <div className="mt-5 flex items-center gap-3 flex-wrap">
