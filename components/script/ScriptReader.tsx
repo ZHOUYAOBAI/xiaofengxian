@@ -631,6 +631,11 @@ function ScriptPage({
   onStar: (idx: number) => void;
 }) {
   const act = SCRIPT.acts.find((a) => a.id === actId)!;
+  const hlRole = selected.size === 1 ? Array.from(selected)[0] : null;
+  const hlLines = hlRole
+    ? SCRIPT.lines.filter((l) => l.roleName === hlRole && l.kind !== 'stage' && l.text.trim() && l.actId === actId)
+    : [];
+  const hlColor = hlRole ? (ROLE_COLOR[hlRole] || 'var(--gold)') : 'var(--gold)';
   return (
     <div className="rounded-2xl px-5 sm:px-8 py-8"
       style={{ background: 'var(--paper)', border: '1px solid rgba(201,162,75,0.4)', boxShadow: '0 0 0 1px rgba(201,162,75,0.12)' }}>
@@ -640,6 +645,22 @@ function ScriptPage({
           {act.scenes.length} 场 · {mask ? '背词自测：点遮罩行翻开' : '点选角色即可高亮其台词'}
         </span>
       </div>
+
+      {hlRole && !mask && (
+        <div className="mb-6 px-4 py-2.5 rounded-xl flex items-center gap-3 text-[13px]"
+          style={{ background: `${hlColor}14`, border: `1px solid ${hlColor}44`, color: 'var(--ink)' }}>
+          <span className="inline-block w-2.5 h-2.5 rounded-sm shrink-0" style={{ background: hlColor }} />
+          {hlLines.length > 0 ? (
+            <span>
+              高亮中：<b style={{ color: hlColor }}>{hlRole}</b> · 本幕 {hlLines.length} 句台词已凸现
+            </span>
+          ) : (
+            <span>
+              <b style={{ color: hlColor }}>{hlRole}</b> 本幕没有台词，切到别的幕试试
+            </span>
+          )}
+        </div>
+      )}
 
       {act.scenes.map((sc) => (
         <div key={sc.id} className="mb-9">
@@ -779,10 +800,10 @@ function ScriptLine({
   }
 
   const base: React.CSSProperties = {
-    opacity: dim ? 0.3 : 1,
+    opacity: dim ? 0.25 : 1,
     borderColor: 'rgba(139,123,107,0.12)',
     background: on
-      ? `${color}14`
+      ? `${color}22`
       : isSing
         ? 'rgba(201,162,75,0.05)'
         : 'transparent',
@@ -815,7 +836,7 @@ function ScriptLine({
       <p
         className="flex-1 leading-[1.95] transition-all"
         style={{
-          color: on ? '#1D1915' : isSing ? '#4A3A26' : '#2E2620',
+          color: on ? '#16130F' : isSing ? '#4A3A26' : '#2E2620',
           fontWeight: on ? 600 : 400,
           fontSize: isSing ? 17 : 15.5,
           fontFamily: isSing ? 'var(--serif), serif' : 'inherit',
