@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { SCRIPT, SONG_TITLE, SONG_RAW, ROLE_COLOR } from '@/lib/script-data';
 import VoiceDemo from './VoiceDemo';
+import VoiceTTSSettings from './VoiceTTSSettings';
+import { loadTTSConfig, speakWithHuoshan, stopHuoshan, TTSConfig } from './HuoshanTTS';
 
 /**
  * 演员工作台
@@ -109,10 +111,22 @@ export default function ScriptReader() {
   /* ===== TTS ===== */
   const cleanText = (t: string) => t.replace(/（[^）]*）/g, '').replace(/\s+/g, '').trim();
 
-  const speak = (text: string, lineIdx?: number) => {
+  // 火山真人 TTS 配置（可空）
+  const [ttsCfg, setTtsCfg] = useState<TTSConfig | null>(null);
+  useEffect(() => {
+    setTtsCfg(loadTTSConfig());
+  }, []);
+
+  /** 逐句朗读：优先火山真人 TTS，失败回退浏览器语音 */
+  const speak = async (text: string, lineIdx?: number) => {
     const s = speechRef.current;
     if (!s || !text) return;
     s.cancel();
+    const ok = await speakWithHuoshan(cleanText(text), ttsCfg, {
+      onStart: () => { setSpeaking(true); if (lineIdx != null) setReadingIdx(lineIdx); },
+      onEnd: () => { setSpeaking(false); setReadingIdx(null); },
+    });
+    if (ok) return;
     const u = new SpeechSynthesisUtterance(cleanText(text));
     if (voice) u.voice = voice;
     u.lang = 'zh-CN';
@@ -127,6 +141,7 @@ export default function ScriptReader() {
 
   const stopSpeak = () => {
     speechRef.current?.cancel();
+    stopHuoshan();
     setSpeaking(false);
     setActSpeaking(false);
     setReadingIdx(null);
@@ -134,7 +149,7 @@ export default function ScriptReader() {
 
   const PAUSE_MS = 380;
 
-  const speakAct = (actId: string) => {
+  const speakAct = async (actId: string) => {
     const s = speechRef.current;
     if (!s) return;
     s.cancel();
@@ -145,19 +160,25 @@ export default function ScriptReader() {
       .map((l) => ({ text: cleanText(l.text), idx: SCRIPT.lines.indexOf(l) }));
     if (!queue.length) return;
     setActSpeaking(true);
-    let idx = 0;
-    const next = () => {
-      if (!s || idx >= queue.length) {
+    let qi = 0;
+    const next = async () => {
+      if (!s || qi >= queue.length) {
         setActSpeaking(false);
         setReadingIdx(null);
         return;
       }
-      const item = queue[idx];
-      idx += 1;
+      const item = queue[qi];
+      qi += 1;
       setReadingIdx(item.idx);
       // 当前句滚动到视口（跟读）
       const el = document.querySelector(`[data-line="${item.idx}"]`);
       el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      // 优先火山真人 TTS
+      const done = await speakWithHuoshan(item.text, ttsCfg, {
+        onEnd: () => { setTimeout(() => { next(); }, PAUSE_MS); },
+        onError: () => { /* 单句失败不打断，下一句继续 */ },
+      });
+      if (done) return;
       const u = new SpeechSynthesisUtterance(item.text);
       if (voice) u.voice = voice;
       u.lang = 'zh-CN';
@@ -259,6 +280,7 @@ export default function ScriptReader() {
               </>
             )}
           </div>
+          <VoiceTTSSettings onChange={(c) => setTtsCfg(c)} />
           {speaking && <span className="text-[12px] text-[#8C6F2E] animate-pulse">▶ 朗读中</span>}
         </div>
 
