@@ -139,6 +139,21 @@ export default function ScriptReader() {
   const coldCount = practiceRole ? Object.values(roleMaster).filter((v) => v === 'cold').length : 0;
   const coldLines = practiceRole ? roleLines.filter(({ i }) => roleMaster[i] === 'cold') : [];
 
+  /* 抽背范围：默认跟当前幕（按幕排戏时不会抽到别的幕），可切全剧复习 */
+  const [drillScope, setDrillScope] = useState<'act' | 'all'>('act');
+  const drillLines = useMemo(
+    () =>
+      practiceRole
+        ? drillScope === 'act'
+          ? roleLines.filter(({ l }) => l.actId === activeAct)
+          : roleLines
+        : [],
+    [practiceRole, drillScope, roleLines, activeAct]
+  );
+  const drillHot = practiceRole ? drillLines.filter(({ i }) => roleMaster[i] === 'hot').length : 0;
+  const drillCold = practiceRole ? drillLines.filter(({ i }) => roleMaster[i] === 'cold').length : 0;
+  const drillColdLines = practiceRole ? drillLines.filter(({ i }) => roleMaster[i] === 'cold') : [];
+
   const reveal = (role: string, idx: number) => {
     setProgress((p) => {
       const next = { ...p, [role]: { ...(p[role] || {}), [idx]: true as const } };
@@ -151,7 +166,7 @@ export default function ScriptReader() {
   };
 
   const revealAll = () => {
-    roleLines.forEach(({ i }) => reveal(practiceRole!, i));
+    actRoleLines.forEach(({ i }) => reveal(practiceRole!, i));
   };
 
   const markMastery = (role: string, idx: number, v: 'hot' | 'cold') => {
@@ -503,9 +518,15 @@ export default function ScriptReader() {
                   </button>
                 </div>
                 <Bar ratio={actRoleLines.length ? actRoleDone / actRoleLines.length : 0} color="var(--gold)" />
-                <p className="mt-2 text-[11.5px]" style={{ color: 'var(--muted)' }}>
-                  全剧已背 {roleDone}/{roleLines.length} 句 · 切换幕次练习对应台词
-                </p>
+                {actRoleLines.length === 0 ? (
+                  <p className="mt-2 text-[11.5px]" style={{ color: 'var(--muted)' }}>
+                    本幕没有 {practiceRole} 的台词，切到其他幕试试
+                  </p>
+                ) : (
+                  <p className="mt-2 text-[11.5px]" style={{ color: 'var(--muted)' }}>
+                    全剧已背 {roleDone}/{roleLines.length} 句 · 切换幕次练习对应台词
+                  </p>
+                )}
               </div>
             </section>
           )}
@@ -514,21 +535,33 @@ export default function ScriptReader() {
             <section>
               <SideTitle>掌握进度</SideTitle>
               <div className="px-4 py-3 rounded-xl" style={{ background: 'rgba(201,162,75,0.1)', border: '1px solid rgba(201,162,75,0.3)' }}>
-                <div className="flex items-center justify-between text-[13px] mb-2" style={{ color: 'var(--gold-soft)' }}>
-                  <span><b>{practiceRole}</b> · {roleLines.length} 句</span>
-                  <button onClick={() => resetMastery(practiceRole)} className="px-2.5 py-1 rounded-full text-[12px]" style={{ border: '1px solid rgba(232,165,155,0.45)', color: '#E8A59B' }}>
-                    重置
-                  </button>
+                <div className="flex items-center justify-between gap-2 mb-2">
+                  <span className="text-[13px]" style={{ color: 'var(--gold-soft)' }}>
+                    <b>{practiceRole}</b> · {drillLines.length} 句
+                  </span>
+                  <div className="flex rounded-full overflow-hidden text-[11.5px]" style={{ border: '1px solid rgba(201,162,75,0.4)' }}>
+                    <button onClick={() => setDrillScope('act')} className="px-2.5 py-1 transition-colors"
+                      style={{ background: drillScope === 'act' ? 'var(--gold)' : 'transparent', color: drillScope === 'act' ? '#0E1A24' : 'var(--muted)', fontWeight: drillScope === 'act' ? 600 : 400 }}>
+                      本幕
+                    </button>
+                    <button onClick={() => setDrillScope('all')} className="px-2.5 py-1 transition-colors"
+                      style={{ background: drillScope === 'all' ? 'var(--gold)' : 'transparent', color: drillScope === 'all' ? '#0E1A24' : 'var(--muted)', fontWeight: drillScope === 'all' ? 600 : 400 }}>
+                      全剧
+                    </button>
+                  </div>
                 </div>
                 <div className="flex items-center gap-2 text-[12.5px] mb-2" style={{ color: 'var(--muted)' }}>
-                  <Chip n={hotCount} label="已熟" c="#7FB069" />
-                  <Chip n={coldCount} label="再练" c="#E8A59B" />
-                  <Chip n={roleLines.length - hotCount - coldCount} label="未练" c="var(--muted)" />
+                  <Chip n={drillHot} label="已熟" c="#7FB069" />
+                  <Chip n={drillCold} label="再练" c="#E8A59B" />
+                  <Chip n={drillLines.length - drillHot - drillCold} label="未练" c="var(--muted)" />
                 </div>
-                <Bar ratio={roleLines.length ? (hotCount + coldCount) / roleLines.length : 0} color="var(--gold)" />
-                {coldLines.length > 0 && (
-                  <button onClick={() => { if (coldLines[0]) jumpToLine(coldLines[0].i); }} className="mt-2 w-full text-[12px] text-left" style={{ color: '#E8A59B' }}>
-                    错题集 {coldLines.length} 句 · 跳到第一句重看 ↓
+                <Bar ratio={drillLines.length ? (drillHot + drillCold) / drillLines.length : 0} color="var(--gold)" />
+                {drillScope === 'act' && drillLines.length === 0 && (
+                  <p className="mt-2 text-[11.5px]" style={{ color: 'var(--muted)' }}>本幕没有 {practiceRole} 的台词，切幕或改抽全剧。</p>
+                )}
+                {drillColdLines.length > 0 && (
+                  <button onClick={() => { if (drillColdLines[0]) jumpToLine(drillColdLines[0].i); }} className="mt-2 w-full text-[12px] text-left" style={{ color: '#E8A59B' }}>
+                    错题集 {drillColdLines.length} 句 · 跳到第一句重看 ↓
                   </button>
                 )}
               </div>
@@ -578,7 +611,7 @@ export default function ScriptReader() {
             )
           ) : mode === 'drill' ? (
             practiceRole ? (
-              <DrillStage role={practiceRole} roleLines={roleLines} mastery={mastery[practiceRole] || {}} onMark={markMastery} />
+              <DrillStage key={`${practiceRole}-${drillScope}-${activeAct}`} role={practiceRole} roleLines={drillLines} mastery={mastery[practiceRole] || {}} onMark={markMastery} />
             ) : (
               <EmptyStage title="随机抽背 · 聚光灯"
                 hint="在左栏「角色」中选一位演员（如 蔡锷），舞台灯光即起：系统随机抽一句该角色的台词，先露首字，你在心里接完，再揭晓对照，并标记 记住了 / 再练练。" />
@@ -1036,12 +1069,16 @@ function DuetStage({ roleA, roleB }: { roleA: string; roleB: string }) {
       for (const sc of act.scenes) {
         let lastAny: { text: string; role: string } | null = null;
         let lastA: { text: string } | null = null;
+        let lastB: { text: string } | null = null;
         for (const idx of sc.lineIds) {
           const ln = SCRIPT.lines[idx];
           if (ln.kind === 'stage' || !ln.roleName || !ln.text.trim()) continue;
           if (isSinging(idx)) continue; // 唱词不参与对手戏，只练对白
           if (ln.roleName === roleB) {
-            if (lastA) {
+            if (lastB) {
+              // 自己连说：cue 应是自己的上一句，而非更早的对方旧词
+              out.push({ cue: lastB.text, cueRole: `${roleB}·连说`, text: ln.text, actNum: act.num, sceneNo: sc.no });
+            } else if (lastA) {
               out.push({ cue: lastA.text, cueRole: roleA, text: ln.text, actNum: act.num, sceneNo: sc.no });
             } else if (lastAny) {
               out.push({ cue: lastAny.text, cueRole: lastAny.role, text: ln.text, actNum: act.num, sceneNo: sc.no });
@@ -1049,7 +1086,11 @@ function DuetStage({ roleA, roleB }: { roleA: string; roleB: string }) {
               out.push({ cue: '', cueRole: '', text: ln.text, actNum: act.num, sceneNo: sc.no });
             }
           }
-          if (ln.roleName === roleA) lastA = { text: ln.text };
+          if (ln.roleName === roleB) lastB = { text: ln.text };
+          else {
+            if (ln.roleName === roleA) lastA = { text: ln.text };
+            lastB = null; // 别人插话，连说中断
+          }
           lastAny = { text: ln.text, role: ln.roleName };
         }
       }
@@ -1080,7 +1121,12 @@ function DuetStage({ roleA, roleB }: { roleA: string; roleB: string }) {
             <div key={k} className="rounded-xl overflow-hidden" style={{ border: '1px solid rgba(201,162,75,0.35)' }}>
               <div className="px-5 py-3.5" style={{ background: 'rgba(201,162,75,0.08)', borderLeft: '3px solid rgba(201,162,75,0.6)' }}>
                 <div className="text-[11px] tracking-[0.2em] mb-1" style={{ color: 'var(--tea)' }}>
-                  {p.actNum} · 第{p.sceneNo}场 · {p.cueRole || '开场'}
+                  {p.actNum} · 第{p.sceneNo}场 ·{' '}
+                  {p.cueRole?.includes('·连说') ? (
+                    <span style={{ color: 'var(--gold-soft)' }}>自己连说 · 接上一句</span>
+                  ) : (
+                    p.cueRole || '开场'
+                  )}
                 </div>
                 <p className="text-[14.5px] leading-[1.9]" style={{ color: 'var(--ink)' }}>
                   {p.cue || '—— 本场开场，你的词 ——'}
