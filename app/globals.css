@@ -214,10 +214,11 @@ body {
   border-radius: 10px;
 }
 .script-star-btn {
-  opacity: 0;
+  opacity: 0.35;
   transition: opacity 0.15s ease;
 }
 .script-line:hover .script-star-btn,
+.script-star-btn:hover,
 .script-star-btn.on {
   opacity: 1;
 }

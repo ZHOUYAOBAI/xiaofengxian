@@ -128,6 +128,12 @@ export default function ScriptReader() {
     [practiceRole]
   );
   const roleDone = practiceRole ? Object.keys(progress[practiceRole] || {}).length : 0;
+  const actRoleLines = practiceRole
+    ? roleLines.filter(({ l }) => l.actId === activeAct)
+    : [];
+  const actRoleDone = practiceRole
+    ? actRoleLines.filter(({ i }) => progress[practiceRole]?.[i]).length
+    : 0;
   const roleMaster = practiceRole ? mastery[practiceRole] || {} : {};
   const hotCount = practiceRole ? Object.values(roleMaster).filter((v) => v === 'hot').length : 0;
   const coldCount = practiceRole ? Object.values(roleMaster).filter((v) => v === 'cold').length : 0;
@@ -189,11 +195,13 @@ export default function ScriptReader() {
 
   /* ---- 定位跳转（切幕 → 滚动 → 高亮） ---- */
   const jumpToLine = (idx: number) => {
+    setMode('read'); // 背诵/抽背/对手戏模式下正文无定位行，先回阅读模式
     setActiveAct(SCRIPT.lines[idx].actId);
     setQuery('');
     setJump({ line: idx });
   };
   const jumpToSong = (song: number) => {
+    setMode('read');
     const first = Object.keys(SINGING).find((k) => SINGING[k].song === song);
     if (first != null) setActiveAct(SCRIPT.lines[+first].actId);
     setJump({ song });
@@ -273,6 +281,14 @@ export default function ScriptReader() {
 
   const duetRole = selected.size === 2 ? Array.from(selected)[0] : null;
   const duetPartner = selected.size === 2 ? Array.from(selected)[1] : null;
+  // 对手戏默认配对：已选两位按选择顺序；未选/选一位时带入当前练习角色 + 默认对手（蔡锷⇄小凤仙）
+  const effDuet = useMemo(() => {
+    const s = Array.from(selected);
+    if (s.length >= 2) return { roleA: s[1], roleB: s[0] };
+    const pri = s[0] || practiceRole || '蔡锷';
+    const partner = pri === '蔡锷' ? '小凤仙' : pri === '小凤仙' ? '蔡锷' : '蔡锷';
+    return { roleA: partner, roleB: pri };
+  }, [selected, practiceRole]);
 
   return (
     <div style={{ background: 'var(--paper)', color: 'var(--ink)', minHeight: '100vh', paddingTop: 88 }}>
@@ -395,6 +411,15 @@ export default function ScriptReader() {
                 </button>
               )}
             </div>
+            {mode === 'duet' && (
+              <SideHint>
+                {selected.size === 0
+                  ? '对手戏模式：点选两位演员，按剧本顺序排出对白（已自动带上你的练习角色）。'
+                  : selected.size === 1
+                    ? '再点一位演员，组成对手戏。'
+                    : '已选两位，正文区开始接词练习。'}
+              </SideHint>
+            )}
             <div className="grid grid-cols-3 gap-2">
               {SCRIPT.roles.map((r) => {
                 const on = selected.has(r.name);
@@ -471,13 +496,16 @@ export default function ScriptReader() {
               <div className="px-4 py-3 rounded-xl" style={{ background: 'rgba(201,162,75,0.1)', border: '1px solid rgba(201,162,75,0.3)' }}>
                 <div className="flex items-center justify-between text-[13px]">
                   <span style={{ color: 'var(--gold-soft)' }}>
-                    <b>{practiceRole}</b> · 已背 <b>{roleDone}</b>/{roleLines.length}
+                    <b>{practiceRole}</b> · 本幕已背 <b>{actRoleDone}</b>/{actRoleLines.length}
                   </span>
                   <button onClick={revealAll} className="px-3 py-1 rounded-full text-[12px]" style={{ border: '1px solid rgba(201,162,75,0.45)', color: 'var(--gold-soft)' }}>
                     翻开全部
                   </button>
                 </div>
-                <Bar ratio={roleLines.length ? roleDone / roleLines.length : 0} color="var(--gold)" />
+                <Bar ratio={actRoleLines.length ? actRoleDone / actRoleLines.length : 0} color="var(--gold)" />
+                <p className="mt-2 text-[11.5px]" style={{ color: 'var(--muted)' }}>
+                  全剧已背 {roleDone}/{roleLines.length} 句 · 切换幕次练习对应台词
+                </p>
               </div>
             </section>
           )}
@@ -499,8 +527,8 @@ export default function ScriptReader() {
                 </div>
                 <Bar ratio={roleLines.length ? (hotCount + coldCount) / roleLines.length : 0} color="var(--gold)" />
                 {coldLines.length > 0 && (
-                  <button onClick={() => setMode('read')} className="mt-2 w-full text-[12px] text-left" style={{ color: '#E8A59B' }}>
-                    错题集 {coldLines.length} 句 · 去阅读模式重看 ↓
+                  <button onClick={() => { if (coldLines[0]) jumpToLine(coldLines[0].i); }} className="mt-2 w-full text-[12px] text-left" style={{ color: '#E8A59B' }}>
+                    错题集 {coldLines.length} 句 · 跳到第一句重看 ↓
                   </button>
                 )}
               </div>
@@ -542,8 +570,8 @@ export default function ScriptReader() {
         {/* ===== 右栏 ===== */}
         <main className="flex-1 min-w-0 w-full">
           {mode === 'duet' ? (
-            duetRole && duetPartner ? (
-              <DuetStage roleA={duetPartner} roleB={duetRole} />
+            effDuet ? (
+              <DuetStage roleA={effDuet.roleA} roleB={effDuet.roleB} />
             ) : (
               <EmptyStage title="对手戏 · 接词排练"
                 hint="在左栏「角色」中点选两位演员（如 蔡锷 + 小凤仙），系统按剧本顺序排出对白：先亮对方台词做提示，你接自己的词，点击翻看对照。" />
@@ -913,13 +941,13 @@ function DrillStage({
   const scene = SCRIPT.acts.find((a) => a.id === line.l.actId)?.scenes.find((s) => s.id === line.l.sceneId);
   const act = SCRIPT.acts.find((a) => a.id === line.l.actId);
   const color = ROLE_COLOR[role] || 'var(--gold)';
-  let cue: string | null = null;
+  let cue: { text: string; role: string } | null = null;
   if (scene) {
     const myIdx = scene.lineIds.indexOf(cur.i);
     for (let k = myIdx - 1; k >= 0; k--) {
       const prev = SCRIPT.lines[scene.lineIds[k]];
       if (prev.kind !== 'stage' && prev.text.trim()) {
-        cue = prev.text;
+        cue = { text: prev.text, role: prev.roleName || '台词' };
         break;
       }
     }
@@ -941,10 +969,15 @@ function DrillStage({
       </div>
 
       <div className="px-6 py-10">
-        {cue && (
+        {cue ? (
           <div className="mb-6 px-4 py-2.5 rounded-lg text-[13px] italic leading-relaxed"
             style={{ background: 'rgba(250,246,238,0.05)', color: 'var(--muted)', borderLeft: '2px solid rgba(201,162,75,0.4)' }}>
-            上句 · {cue.length > 46 ? cue.slice(0, 46) + '…' : cue}
+            上句 · {cue.role}：{cue.text.length > 42 ? cue.text.slice(0, 42) + '…' : cue.text}
+          </div>
+        ) : (
+          <div className="mb-6 px-4 py-2.5 rounded-lg text-[13px] italic leading-relaxed"
+            style={{ background: 'rgba(250,246,238,0.05)', color: 'var(--muted)', borderLeft: '2px solid rgba(201,162,75,0.4)' }}>
+            {act?.num} 第{scene?.no}场 · 开场（没有上一句，直接接）
           </div>
         )}
 
@@ -998,17 +1031,26 @@ function DuetStage({ roleA, roleB }: { roleA: string; roleB: string }) {
   const [turned, setTurned] = useState<Set<number>>(new Set());
 
   const pairs = useMemo(() => {
-    const out: { cue: string; text: string; actNum: string; sceneNo: number }[] = [];
+    const out: { cue: string; cueRole: string; text: string; actNum: string; sceneNo: number }[] = [];
     for (const act of SCRIPT.acts) {
       for (const sc of act.scenes) {
+        let lastAny: { text: string; role: string } | null = null;
         let lastA: { text: string } | null = null;
         for (const idx of sc.lineIds) {
           const ln = SCRIPT.lines[idx];
           if (ln.kind === 'stage' || !ln.roleName || !ln.text.trim()) continue;
-          if (ln.roleName === roleB && lastA) {
-            out.push({ cue: lastA.text, text: ln.text, actNum: act.num, sceneNo: sc.no });
+          if (isSinging(idx)) continue; // 唱词不参与对手戏，只练对白
+          if (ln.roleName === roleB) {
+            if (lastA) {
+              out.push({ cue: lastA.text, cueRole: roleA, text: ln.text, actNum: act.num, sceneNo: sc.no });
+            } else if (lastAny) {
+              out.push({ cue: lastAny.text, cueRole: lastAny.role, text: ln.text, actNum: act.num, sceneNo: sc.no });
+            } else {
+              out.push({ cue: '', cueRole: '', text: ln.text, actNum: act.num, sceneNo: sc.no });
+            }
           }
           if (ln.roleName === roleA) lastA = { text: ln.text };
+          lastAny = { text: ln.text, role: ln.roleName };
         }
       }
     }
@@ -1023,7 +1065,7 @@ function DuetStage({ roleA, roleB }: { roleA: string; roleB: string }) {
       <div className="flex items-center gap-3 flex-wrap">
         <span className="font-cn text-[18px]" style={{ color: 'var(--ink)' }}>对手戏 · 你演</span>
         <Seal text={roleB} color={colorB} />
-        <span style={{ color: 'var(--tea)' }}>共 {pairs.length} 组对白 · 已接 {turned.size} 组</span>
+        <span style={{ color: 'var(--tea)' }}>共 {pairs.length} 句对白 · 已接 {turned.size} 句</span>
         <div className="w-40"><Bar ratio={pairs.length ? turned.size / pairs.length : 0} color="var(--gold)" /></div>
       </div>
 
@@ -1038,9 +1080,11 @@ function DuetStage({ roleA, roleB }: { roleA: string; roleB: string }) {
             <div key={k} className="rounded-xl overflow-hidden" style={{ border: '1px solid rgba(201,162,75,0.35)' }}>
               <div className="px-5 py-3.5" style={{ background: 'rgba(201,162,75,0.08)', borderLeft: '3px solid rgba(201,162,75,0.6)' }}>
                 <div className="text-[11px] tracking-[0.2em] mb-1" style={{ color: 'var(--tea)' }}>
-                  {p.actNum} · 第{p.sceneNo}场 · {roleA}
+                  {p.actNum} · 第{p.sceneNo}场 · {p.cueRole || '开场'}
                 </div>
-                <p className="text-[14.5px] leading-[1.9]" style={{ color: 'var(--ink)' }}>{p.cue}</p>
+                <p className="text-[14.5px] leading-[1.9]" style={{ color: 'var(--ink)' }}>
+                  {p.cue || '—— 本场开场，你的词 ——'}
+                </p>
               </div>
               {on ? (
                 <button onClick={() => turn(k)} className="w-full text-left px-5 py-3.5"
